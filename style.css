@@ -1,0 +1,8 @@
+@import "tailwindcss";
+@font-face {
+      font-family: 'TexasTango'; /* Choose a descriptive name for your font */
+      src: local('TexasTango'), url('./texas_tango.otf') format('opentype');
+      /* Adjust the path to your .otf file accordingly */
+      font-weight: normal; /* Define weight if applicable, e.g., bold, light */
+      font-style: normal; /* Define style if applicable, e.g., italic */
+    }

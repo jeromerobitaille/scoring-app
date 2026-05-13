@@ -1,0 +1,105 @@
+{
+  "name": "fwst-scoring",
+  "productName": "FWST Scoring",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Application de scoring rodéo — fonctionne en local sur le réseau WiFi du site, sans dépendance Internet.",
+  "author": {
+    "name": "Jérôme Robitaille",
+    "email": "jerome.robitaille@hotmail.com"
+  },
+  "main": "electron/main.cjs",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "icons": "node scripts/generate-icons.cjs",
+    "electron:dev": "npm run build && electron .",
+    "electron:pack": "npm run build && electron-builder --dir",
+    "electron:make": "npm run build && electron-builder -mw",
+    "electron:make:mac": "npm run build && electron-builder --mac",
+    "electron:make:win": "npm run build && electron-builder --win"
+  },
+  "dependencies": {
+    "@heroicons/react": "^2.2.0",
+    "@tailwindcss/vite": "^4.1.13",
+    "framer-motion": "^12.23.12",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "tailwindcss": "^4.1.13",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.33.0",
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "@vitejs/plugin-react": "^5.0.0",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "eslint": "^9.33.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "globals": "^16.3.0",
+    "png2icons": "^2.0.1",
+    "sharp": "^0.33.5",
+    "vite": "^7.1.2"
+  },
+  "build": {
+    "appId": "ca.veam.fwst-scoring",
+    "productName": "FWST Scoring",
+    "copyright": "Copyright © 2026 Jérôme Robitaille",
+    "directories": {
+      "buildResources": "build",
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "server/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist",
+        "to": "dist",
+        "filter": ["**/*"]
+      }
+    ],
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.sports",
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] }
+      ],
+      "icon": "build/icon.icns",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": null
+    },
+    "dmg": {
+      "title": "FWST Scoring ${version}",
+      "icon": "build/icon.icns"
+    },
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "FWST Scoring"
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "category": "Utility",
+      "icon": "build/icon.png"
+    }
+  }
+}
