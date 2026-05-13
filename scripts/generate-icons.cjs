@@ -42,8 +42,23 @@ const LOGO_FILL = 0.72;
   const logoW = Math.round(logoMeta.width * scale);
   const logoH = Math.round(logoMeta.height * scale);
 
-  const logoBuffer = await sharp(LOGO)
+  // Recolor: extract the logo's alpha mask and apply it over a pure white fill,
+  // so the wordmark renders white regardless of the source artwork color.
+  const alphaMask = await sharp(LOGO)
     .resize(logoW, logoH, { fit: "inside" })
+    .ensureAlpha()
+    .extractChannel("alpha")
+    .toBuffer();
+
+  const logoBuffer = await sharp({
+    create: {
+      width: logoW,
+      height: logoH,
+      channels: 3,
+      background: { r: 255, g: 255, b: 255 },
+    },
+  })
+    .joinChannel(alphaMask)
     .png()
     .toBuffer();
 
