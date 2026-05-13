@@ -13,14 +13,13 @@ const DEFAULT_STATE = {
   theme: "dark",
   bannerWidth: 2592,
   bannerHeight: 216,
-  bannerNameScale: 1.0,   // multiplies base name font (banner only)
+  bannerNameScale: 1.0,
   bannerScoreScale: 1.0,
 };
 
 export default function useSyncedState() {
   const [state, setState] = useState(() => {
     const saved = loadState() ?? {};
-    // Soft-migrate old saves (ensure new keys exist)
     return {
       ...DEFAULT_STATE,
       ...saved,
@@ -31,12 +30,11 @@ export default function useSyncedState() {
   const params = useMemo(() => {
     if (typeof window === "undefined") return { useNet: false, roomId: "default" };
     const p = new URLSearchParams(window.location.search);
-    const useNet = p.get("net") === "1" || p.get("sync") === "net"; // active hub
+    const useNet = p.get("net") === "1" || p.get("sync") === "net";
     const roomId = (p.get("room") || "default").trim();
     return { useNet, roomId };
   }, []);
 
-  // ws URL même origine: ws://host/live-score ou wss://
   const wsURL = useMemo(() => {
     if (typeof window === "undefined") return null;
     const proto = window.location.protocol === "https:" ? "wss" : "ws";
@@ -44,16 +42,15 @@ export default function useSyncedState() {
   }, []);
 
   const sockRef = useRef(null);
+  const [netStatus, setNetStatus] = useState(params.useNet ? "connecting" : "local");
 
-  // Sauvegarde locale
   useEffect(() => saveState(state), [state]);
 
-  // Abonnement — utilise un setState fonctionnel pour comparer au state le plus
-  // récent (pas le snapshot capturé à la souscription).
   useEffect(() => {
     if (params.useNet) {
       const sock = new LocalSocket(wsURL, params.roomId);
       sockRef.current = sock;
+      const offStatus = sock.onStatus(setNetStatus);
       sock.connect();
       const off = sock.on((remote) => {
         setState((prev) => {
@@ -62,9 +59,10 @@ export default function useSyncedState() {
           return remote;
         });
       });
-      return () => { off(); sock.close(); };
+      return () => { off(); offStatus(); sock.close(); };
     }
 
+    setNetStatus("local");
     if (!bus) return;
     const off = bus.on((data) => {
       if (data?.type === "sync:update" && data.payload) {
@@ -74,7 +72,6 @@ export default function useSyncedState() {
     return off;
   }, [params.useNet, params.roomId, wsURL]);
 
-  // push: local + diffuse
   const push = (next) => {
     setState(next);
     saveState(next);
@@ -85,5 +82,5 @@ export default function useSyncedState() {
     }
   };
 
-  return [state, push];
+  return [state, push, { netStatus, roomId: params.roomId, useNet: params.useNet }];
 }

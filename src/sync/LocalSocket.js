@@ -4,15 +4,26 @@ export default class LocalSocket {
     this.roomId = roomId; // ex: sttite-2025
     this.ws = null;
     this.listeners = new Set();
+    this.statusListeners = new Set();
     this._reconnectTimer = null;
     this._closedByUser = false;
     this._lastSentJSON = null;
+    this._status = "idle"; // idle | connecting | open | closed
   }
+  _setStatus(s) {
+    if (this._status === s) return;
+    this._status = s;
+    this.statusListeners.forEach((cb) => { try { cb(s); } catch {} });
+  }
+  get status() { return this._status; }
+
   connect() {
     if (this.ws && (this.ws.readyState === 0 || this.ws.readyState === 1)) return;
+    this._setStatus("connecting");
     this.ws = new WebSocket(this.url);
 
     this.ws.addEventListener("open", () => {
+      this._setStatus("open");
       this.send({ type: "join", room: this.roomId });
     });
 
@@ -26,10 +37,12 @@ export default class LocalSocket {
     });
 
     this.ws.addEventListener("close", () => {
+      this._setStatus("closed");
       if (this._closedByUser) return;
       this.scheduleReconnect();
     });
     this.ws.addEventListener("error", () => {
+      this._setStatus("closed");
       if (this._closedByUser) return;
       this.scheduleReconnect();
     });
@@ -39,6 +52,7 @@ export default class LocalSocket {
     this._reconnectTimer = setTimeout(() => this.connect(), 1000);
   }
   on(cb) { this.listeners.add(cb); return () => this.listeners.delete(cb); }
+  onStatus(cb) { this.statusListeners.add(cb); cb(this._status); return () => this.statusListeners.delete(cb); }
   send(obj) { if (this.ws?.readyState === 1) this.ws.send(JSON.stringify(obj)); }
   push(state) {
     const json = JSON.stringify(state);

@@ -1,16 +1,33 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import useSyncedState from "../state/useSyncedState";
-import { detectIsTimeString, parseScore, computeRanking } from "../utils/score";
+import { detectIsTimeString, parseScore } from "../utils/score";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Label from "../components/ui/Label";
 import TextInput from "../components/ui/TextInput";
 import EntriesTable from "../components/EntriesTable";
-import Top3Preview from "../components/Top3Preview";
-import { Cog6ToothIcon } from '@heroicons/react/24/solid'
-import { PlusCircleIcon, TrashIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import {
+  Cog6ToothIcon,
+  EllipsisVerticalIcon,
+} from "@heroicons/react/24/solid";
+import {
+  PlusCircleIcon,
+  TrashIcon,
+  CheckIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
 import logo from "../assets/logo.png";
 
+const DISCIPLINES = [
+  "Monte de chevaux sans selle",
+  "Course de sauvetage",
+  "Prise du veau au lasso",
+  "Monte de chevaux avec selle",
+  "Course de barils | Femmes",
+  "Échange de cavaliers",
+  "Terrassement du bouvillon",
+  "Monte de taureaux",
+];
 
 function toTitleCase(str) {
   return str.replace(/\p{L}[\p{L}\p{M}'-]*/gu, (w) =>
@@ -18,21 +35,92 @@ function toTitleCase(str) {
   );
 }
 
+function NetStatusDot({ status }) {
+  const color =
+    status === "open"
+      ? "bg-emerald-500"
+      : status === "connecting"
+      ? "bg-amber-400 animate-pulse"
+      : status === "local"
+      ? "bg-zinc-400"
+      : "bg-red-500";
+  const label =
+    status === "open"
+      ? "Synchro active"
+      : status === "connecting"
+      ? "Connexion…"
+      : status === "local"
+      ? "Mode local"
+      : "Synchro hors ligne";
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={`inline-block w-2 h-2 rounded-full ${color}`} />
+      <span>{label}</span>
+    </span>
+  );
+}
+
+function KebabMenu({ onClearAll }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handle = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handle);
+    document.addEventListener("keydown", (e) => e.key === "Escape" && setOpen(false));
+    return () => document.removeEventListener("mousedown", handle);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-label="Plus d'actions"
+        className="p-2 rounded-xl hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 cursor-pointer"
+      >
+        <EllipsisVerticalIcon className="w-5 h-5" />
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-1 w-52 rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg overflow-hidden z-30">
+          <button
+            type="button"
+            onClick={() => { setOpen(false); onClearAll(); }}
+            className="w-full text-left px-4 py-3 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-2 cursor-pointer"
+          >
+            <TrashIcon className="w-4 h-4" />
+            Effacer toutes les entrées
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ControlView() {
-  const [state, push] = useSyncedState();
+  const [state, push, sync] = useSyncedState();
   const [name, setName] = useState("");
   const [score, setScore] = useState("");
   const [editingId, setEditingId] = useState(null);
   const nameRef = useRef(null);
   const scoreRef = useRef(null);
 
-  const top3 = useMemo(() => computeRanking(state.entries, state.scoreMode).slice(0, 3), [state]);
-
   const scoreTrimmed = score.trim();
   const scoreParsed = scoreTrimmed === "" ? null : parseScore(scoreTrimmed);
   const scoreInvalid = scoreTrimmed !== "" && scoreParsed == null;
   const canSubmit = name.trim() !== "" && scoreTrimmed !== "" && !scoreInvalid;
+
+  // #14: dynamic window title
+  useEffect(() => {
+    const base = "FWST Scoring";
+    document.title = state.eventName ? `${base} — ${state.eventName}` : base;
+  }, [state.eventName]);
+
+  // Autofocus name on mount
+  useEffect(() => { nameRef.current?.focus(); }, []);
 
   function resetForm() {
     setName("");
@@ -43,7 +131,6 @@ export default function ControlView() {
 
   function submitEntry() {
     if (!canSubmit) return;
-
     if (editingId) {
       const next = {
         ...state,
@@ -73,7 +160,14 @@ export default function ControlView() {
     resetForm();
   }
 
-  function handleKeyDown(e) {
+  function handleNameKey(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (canSubmit) submitEntry();
+      else scoreRef.current?.focus();
+    }
+  }
+  function handleScoreKey(e) {
     if (e.key === "Enter" && canSubmit) {
       e.preventDefault();
       submitEntry();
@@ -84,7 +178,7 @@ export default function ControlView() {
   }
 
   function clearAll() {
-    if (!confirm("Effacer toutes les entrées ?")) return;
+    if (!confirm("Effacer toutes les entrées de cette discipline ?")) return;
     push({ ...state, entries: [] });
     resetForm();
   }
@@ -110,66 +204,56 @@ export default function ControlView() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-zinc-100 to-zinc-200 dark:from-zinc-950 dark:to-zinc-900 text-zinc-900 dark:text-zinc-100 p-6">
-      <div className="mx-auto max-w-5xl space-y-6">
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-zinc-100 to-zinc-200 dark:from-zinc-950 dark:to-zinc-900 text-zinc-900 dark:text-zinc-100">
+      <div className="flex-1 mx-auto w-full max-w-6xl px-6 pt-5 pb-4 space-y-4">
+
+        {/* Header compact */}
         <header className="flex items-center justify-between gap-4">
-          <div className="flex items-center">
-            <img src={logo} alt="Rodeo Scoring" className="h-24" />
-            <div className="space-y-1 ml-4">
-            <h1 className="text-2xl font-bold">Affichage des pointages – Scoring</h1>
-            <p className="text-sm opacity-70">Ajoutez des compétiteurs et leurs scores/temps.</p>
-          </div>
+          <div className="flex items-center gap-3 min-w-0">
+            <img src={logo} alt="" className="h-12 w-auto flex-shrink-0" />
+            <div className="min-w-0">
+              <h1 className="text-xl md:text-2xl font-bold leading-tight truncate">
+                {state.eventName || "FWST Scoring"}
+              </h1>
+              <p className="text-xs opacity-60">Saisie des pointages</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Button onClick={openSettings}>
               <Cog6ToothIcon className="w-5 h-5 inline-block mr-1 -mt-0.5" />
-               Paramètres</Button>
-            <Button onClick={clearAll} className="bg-red-600 dark:bg-red-600">
-              <TrashIcon className="w-5 h-5 inline-block mr-1 -mt-0.5" />
-              Tout effacer</Button>
+              Paramètres
+            </Button>
+            <KebabMenu onClearAll={clearAll} />
           </div>
         </header>
 
-        <Card>
-          <div className="grid md:grid-cols-2 gap-6 justify-items-center items-end">
-            <div className="w-full max-w-xl">
-              <div className="w-full">
-                <Label>Nom de l’événement / discipline</Label>
-              </div>
-              <select
-                className="w-full rounded-2xl border px-4 py-3 bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700"
-                value={state.eventName || ""}
-                onChange={(e) => push({ ...state, eventName: e.target.value })}
-              >
-                <option value="" disabled>— Choisir une discipline —</option>
-                <option value="Monte de chevaux sans selle">Monte de chevaux sans selle</option>
-                <option value="Course de sauvetage">Course de sauvetage</option>
-                <option value="Prise du veau au lasso">Prise du veau au lasso</option>
-                <option value="Monte de chevaux avec selle">Monte de chevaux avec selle</option>
-                <option value="Course de barils | Femmes">Course de barils | Femmes</option>
-                <option value="Échange de cavaliers">Échange de cavaliers</option>
-                <option value="Terrassement du bouvillon">Terrassement du bouvillon</option>
-                <option value="Monte de taureaux">Monte de taureaux</option>
-              </select>
-            </div>
-
-            <div className="w-full max-w-xl">
-              <div className="w-full">
-                <Label>Mode de classement</Label>
-              </div>
-              <select
-                className="w-full rounded-2xl border px-4 py-3 bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700"
-                value={state.scoreMode}
-                onChange={(e) => push({ ...state, scoreMode: e.target.value })}
-              >
-                <option value="higher">Mode score (Le plus haut est le meilleur)</option>
-                <option value="lower">Mode temps (Le plus bas est le meilleur)</option>
-              </select>
-            </div>
+        {/* Barre de contexte : discipline + mode */}
+        <div className="flex flex-col md:flex-row gap-3 md:items-center md:gap-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white/60 dark:bg-zinc-900/60 backdrop-blur px-4 py-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <Label className="flex-shrink-0">Discipline</Label>
+            <select
+              className="flex-1 min-w-0 rounded-xl border px-3 py-2 bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700"
+              value={state.eventName || ""}
+              onChange={(e) => push({ ...state, eventName: e.target.value })}
+            >
+              <option value="" disabled>— Choisir une discipline —</option>
+              {DISCIPLINES.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
           </div>
-        </Card>
+          <div className="flex items-center gap-3">
+            <Label className="flex-shrink-0">Classement</Label>
+            <select
+              className="rounded-xl border px-3 py-2 bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700"
+              value={state.scoreMode}
+              onChange={(e) => push({ ...state, scoreMode: e.target.value })}
+            >
+              <option value="higher">Score (plus haut = meilleur)</option>
+              <option value="lower">Temps (plus bas = meilleur)</option>
+            </select>
+          </div>
+        </div>
 
-
+        {/* Formulaire principal */}
         <Card>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold">
@@ -179,15 +263,15 @@ export default function ControlView() {
               <button
                 type="button"
                 onClick={resetForm}
-                className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 inline-flex items-center"
+                className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 inline-flex items-center cursor-pointer"
               >
                 <XMarkIcon className="w-4 h-4 mr-1" />
-                Annuler
+                Annuler (Échap)
               </button>
             )}
           </div>
-          <div className="grid md:grid-cols-5 gap-4 items-end">
-            <div className="md:col-span-2">
+          <div className="grid md:grid-cols-12 gap-3 items-end">
+            <div className="md:col-span-5">
               <Label htmlFor="name">Nom du compétiteur</Label>
               <TextInput
                 id="name"
@@ -195,31 +279,38 @@ export default function ControlView() {
                 ref={nameRef}
                 value={name}
                 onChange={(e) => setName(toTitleCase(e.target.value))}
-                onKeyDown={handleKeyDown}
+                onKeyDown={handleNameKey}
                 placeholder="Ex.: Marie Tremblay"
+                autoComplete="off"
+                enterKeyHint="next"
               />
             </div>
-            <div className="md:col-span-2">
-              <Label htmlFor="score">Score / Temps</Label>
+            <div className="md:col-span-4">
+              <Label htmlFor="score">
+                {state.scoreMode === "lower" ? "Temps" : "Score"}
+              </Label>
               <TextInput
                 id="score"
                 name="score"
                 ref={scoreRef}
                 value={score}
                 onChange={(e) => setScore(e.target.value)}
-                onKeyDown={handleKeyDown}
+                onKeyDown={handleScoreKey}
                 placeholder={state.scoreMode === "lower" ? "Ex.: 17.243 ou 00:17.243" : "Ex.: 86.5"}
+                autoComplete="off"
+                inputMode="decimal"
+                enterKeyHint="done"
                 aria-invalid={scoreInvalid || undefined}
                 className={scoreInvalid ? "border-red-500 ring-1 ring-red-500/40 focus:ring-red-500" : ""}
               />
               {scoreInvalid && (
                 <div className="mt-1 text-xs text-red-600 dark:text-red-400">
-                  Score non reconnu. Utilisez un nombre (ex.&nbsp;87.5) ou un temps mm:ss.mmm (ex.&nbsp;00:17.243).
+                  Format invalide. Utilisez un nombre (87.5) ou mm:ss.mmm (00:17.243).
                 </div>
               )}
             </div>
-            <div>
-              <Button onClick={submitEntry} disabled={!canSubmit}>
+            <div className="md:col-span-3">
+              <Button onClick={submitEntry} disabled={!canSubmit} className="w-full">
                 {editingId ? (
                   <>
                     <CheckIcon className="w-5 h-5 inline-block mr-1 -mt-0.5" />
@@ -228,32 +319,49 @@ export default function ControlView() {
                 ) : (
                   <>
                     <PlusCircleIcon className="w-5 h-5 inline-block mr-1 -mt-0.5" />
-                    Ajouter l'entrée
+                    Ajouter
                   </>
                 )}
               </Button>
+              <p className="mt-1 text-[11px] opacity-60 text-center">
+                Entrée pour valider · Échap pour annuler
+              </p>
             </div>
           </div>
         </Card>
 
-        <div className="grid md:grid-cols-2 gap-6">
-          <Card>
-            <h2 className="text-lg font-semibold mb-3">Top 3 (aperçu)</h2>
-            <Top3Preview entries={top3} scoreMode={state.scoreMode} eventName={state.eventName} />
-          </Card>
-          <Card>
-            <div className="flex justify-between">
-            <h2 className="text-lg font-semibold mb-3">Toutes les entrées</h2>
-            </div>
-            <EntriesTable
-              entries={state.entries}
-              scoreMode={state.scoreMode}
-              onRemove={remove}
-              onEdit={startEdit}
-            />
-          </Card>
-        </div>
+        {/* Table pleine largeur */}
+        <Card>
+          <div className="flex items-baseline justify-between mb-3">
+            <h2 className="text-lg font-semibold">Résultats</h2>
+            <span className="text-xs opacity-60 tabular-nums">
+              {state.entries.length} entrée{state.entries.length > 1 ? "s" : ""}
+            </span>
+          </div>
+          <EntriesTable
+            entries={state.entries}
+            scoreMode={state.scoreMode}
+            onRemove={remove}
+            onEdit={startEdit}
+            editingId={editingId}
+          />
+        </Card>
       </div>
+
+      {/* Barre de statut */}
+      <footer className="mt-2 border-t border-zinc-200 dark:border-zinc-800 bg-white/60 dark:bg-zinc-950/60 backdrop-blur">
+        <div className="mx-auto max-w-6xl px-6 py-2 flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-400 gap-4">
+          <div className="flex items-center gap-4 min-w-0">
+            <NetStatusDot status={sync?.netStatus || "local"} />
+            <span className="opacity-70">
+              Room: <span className="font-mono">{sync?.roomId || "default"}</span>
+            </span>
+          </div>
+          <div className="truncate opacity-70">
+            {state.eventName || "Aucune discipline sélectionnée"}
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
