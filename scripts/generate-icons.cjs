@@ -1,30 +1,62 @@
 #!/usr/bin/env node
-// Renders build/icon.svg into PNG/ICNS/ICO for electron-builder.
-// Uses sharp (SVG -> PNG) and png2icons (PNG -> ICNS + ICO).
+// Renders build/icon.svg + public/sttite.png into PNG/ICNS/ICO for electron-builder.
+// The SVG is the rounded brown card background; the Saint-Tite festival logo is
+// composited centered on top. Uses sharp (SVG -> PNG) and png2icons (PNG -> ICNS + ICO).
 const fs = require("node:fs");
 const path = require("node:path");
 const sharp = require("sharp");
 const png2icons = require("png2icons");
 
-const BUILD = path.join(__dirname, "..", "build");
+const ROOT = path.join(__dirname, "..");
+const BUILD = path.join(ROOT, "build");
 const SVG = path.join(BUILD, "icon.svg");
+const LOGO = path.join(ROOT, "public", "sttite.png");
 const PNG = path.join(BUILD, "icon.png");
 const ICNS = path.join(BUILD, "icon.icns");
 const ICO = path.join(BUILD, "icon.ico");
+
+const CANVAS = 1024;
+// Logo occupies ~72% of the smaller canvas dimension — leaves a comfortable margin
+const LOGO_FILL = 0.72;
 
 (async () => {
   if (!fs.existsSync(SVG)) {
     console.error(`Missing source: ${SVG}`);
     process.exit(1);
   }
+  if (!fs.existsSync(LOGO)) {
+    console.error(`Missing logo: ${LOGO}`);
+    process.exit(1);
+  }
 
-  const svg = fs.readFileSync(SVG);
+  // 1. Render the SVG background to a base canvas
+  const bg = await sharp(fs.readFileSync(SVG), { density: 384 })
+    .resize(CANVAS, CANVAS)
+    .png()
+    .toBuffer();
 
-  await sharp(svg, { density: 384 })
-    .resize(1024, 1024)
+  // 2. Resize the logo to fit within LOGO_FILL of the canvas (preserving aspect ratio)
+  const logoMeta = await sharp(LOGO).metadata();
+  const maxDim = Math.round(CANVAS * LOGO_FILL);
+  const scale = Math.min(maxDim / logoMeta.width, maxDim / logoMeta.height);
+  const logoW = Math.round(logoMeta.width * scale);
+  const logoH = Math.round(logoMeta.height * scale);
+
+  const logoBuffer = await sharp(LOGO)
+    .resize(logoW, logoH, { fit: "inside" })
+    .png()
+    .toBuffer();
+
+  // 3. Composite logo centered on the brown card
+  await sharp(bg)
+    .composite([{
+      input: logoBuffer,
+      left: Math.round((CANVAS - logoW) / 2),
+      top: Math.round((CANVAS - logoH) / 2),
+    }])
     .png({ compressionLevel: 9 })
     .toFile(PNG);
-  console.log("✓ build/icon.png (1024x1024)");
+  console.log(`✓ build/icon.png (${CANVAS}x${CANVAS}, logo ${logoW}x${logoH})`);
 
   const pngBuffer = fs.readFileSync(PNG);
 
