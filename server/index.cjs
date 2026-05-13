@@ -1,8 +1,8 @@
 const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
-const os = require("node:os");
 const { attachHub } = require("./hub.cjs");
+const { getLanAddresses } = require("./net.cjs");
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -23,19 +23,6 @@ const MIME = {
   ".woff2":"font/woff2",
   ".map":  "application/json; charset=utf-8",
 };
-
-function getLanAddresses() {
-  const nets = os.networkInterfaces();
-  const out = [];
-  for (const name of Object.keys(nets)) {
-    for (const ni of nets[name] || []) {
-      if (ni.family === "IPv4" && !ni.internal) {
-        out.push({ iface: name, address: ni.address });
-      }
-    }
-  }
-  return out;
-}
 
 function safeJoin(root, urlPath) {
   const decoded = decodeURIComponent(urlPath.split("?")[0]);
@@ -108,4 +95,4 @@ function createServer({ staticDir, port = 5050, hubPath = "/live-score" }) {
   });
 }
 
-module.exports = { createServer, getLanAddresses };
+module.exports = { createServer };

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import useSyncedState from "../state/useSyncedState";
-import { computeRanking, formatScore } from "../utils/score";
+import { computeRanking, formatScore, entryDisplayMode } from "../utils/score";
 import logo from "../assets/logo.png";
 
 
@@ -76,7 +76,7 @@ export default function DisplayView() {
           >
             {current.map((e) => {
               const isTime = state.scoreMode === "lower" || e.timeHint;
-              const displayRank = ranked.findIndex((r) => r.id === e.id) + 1;
+              const displayRank = e.rank;
 
               return (
                 <div
@@ -109,10 +109,7 @@ export default function DisplayView() {
 
                   <div className="flex items-baseline gap-2">
                     <div className="text-4xl md:text-6xl font-extrabold tabular-nums whitespace-nowrap">
-                      {formatScore(
-                        e.parsed,
-                        e.timeHint || (state.scoreMode === "lower" ? "time" : null)
-                      )}
+                      {formatScore(e.parsed, entryDisplayMode(e, state.scoreMode))}
                     </div>
                     <div className="text-lg md:text-2xl opacity-70">
                       {isTime ? "sec" : "pts"}

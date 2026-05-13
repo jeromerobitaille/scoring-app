@@ -8,7 +8,7 @@ import TextInput from "../components/ui/TextInput";
 import EntriesTable from "../components/EntriesTable";
 import Top3Preview from "../components/Top3Preview";
 import { Cog6ToothIcon } from '@heroicons/react/24/solid'
-import { PlusCircleIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { PlusCircleIcon, TrashIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import logo from "../assets/logo.png";
 
 
@@ -23,30 +23,84 @@ export default function ControlView() {
   const [state, push] = useSyncedState();
   const [name, setName] = useState("");
   const [score, setScore] = useState("");
+  const [editingId, setEditingId] = useState(null);
   const nameRef = useRef(null);
+  const scoreRef = useRef(null);
 
   const top3 = useMemo(() => computeRanking(state.entries, state.scoreMode).slice(0, 3), [state]);
 
-  function addEntry() {
-    const entry = {
-      id: crypto.randomUUID(),
-      name: name.trim() || "(sans nom)",
-      raw: score,
-      parsed: parseScore(score),
-      timeHint: detectIsTimeString(score),
-    };
-    const next = { ...state, entries: [entry, ...state.entries] };
-    push(next);
-    setName(""); setScore(""); nameRef.current?.focus();
+  const scoreTrimmed = score.trim();
+  const scoreParsed = scoreTrimmed === "" ? null : parseScore(scoreTrimmed);
+  const scoreInvalid = scoreTrimmed !== "" && scoreParsed == null;
+  const canSubmit = name.trim() !== "" && scoreTrimmed !== "" && !scoreInvalid;
+
+  function resetForm() {
+    setName("");
+    setScore("");
+    setEditingId(null);
+    nameRef.current?.focus();
+  }
+
+  function submitEntry() {
+    if (!canSubmit) return;
+
+    if (editingId) {
+      const next = {
+        ...state,
+        entries: state.entries.map((e) =>
+          e.id === editingId
+            ? {
+                ...e,
+                name: name.trim() || "(sans nom)",
+                raw: score,
+                parsed: scoreParsed,
+                timeHint: detectIsTimeString(score),
+              }
+            : e
+        ),
+      };
+      push(next);
+    } else {
+      const entry = {
+        id: crypto.randomUUID(),
+        name: name.trim() || "(sans nom)",
+        raw: score,
+        parsed: scoreParsed,
+        timeHint: detectIsTimeString(score),
+      };
+      push({ ...state, entries: [entry, ...state.entries] });
+    }
+    resetForm();
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === "Enter" && canSubmit) {
+      e.preventDefault();
+      submitEntry();
+    } else if (e.key === "Escape" && editingId) {
+      e.preventDefault();
+      resetForm();
+    }
   }
 
   function clearAll() {
     if (!confirm("Effacer toutes les entrées ?")) return;
     push({ ...state, entries: [] });
+    resetForm();
   }
 
   function remove(id) {
+    if (id === editingId) resetForm();
     push({ ...state, entries: state.entries.filter((e) => e.id !== id) });
+  }
+
+  function startEdit(id) {
+    const entry = state.entries.find((e) => e.id === id);
+    if (!entry) return;
+    setEditingId(id);
+    setName(entry.name === "(sans nom)" ? "" : entry.name);
+    setScore(entry.raw ?? "");
+    setTimeout(() => scoreRef.current?.focus(), 0);
   }
 
   function openSettings() {
@@ -117,32 +171,67 @@ export default function ControlView() {
 
 
         <Card>
-          <h2 className="text-lg font-semibold mb-3">Ajouter une entrée</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold">
+              {editingId ? "Modifier l'entrée" : "Ajouter une entrée"}
+            </h2>
+            {editingId && (
+              <button
+                type="button"
+                onClick={resetForm}
+                className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 inline-flex items-center"
+              >
+                <XMarkIcon className="w-4 h-4 mr-1" />
+                Annuler
+              </button>
+            )}
+          </div>
           <div className="grid md:grid-cols-5 gap-4 items-end">
             <div className="md:col-span-2">
-              <Label>Nom du compétiteur</Label>
+              <Label htmlFor="name">Nom du compétiteur</Label>
               <TextInput
                 id="name"
                 name="name"
                 ref={nameRef}
                 value={name}
                 onChange={(e) => setName(toTitleCase(e.target.value))}
+                onKeyDown={handleKeyDown}
                 placeholder="Ex.: Marie Tremblay"
               />
-
             </div>
             <div className="md:col-span-2">
-              <Label>Score / Temps</Label>
+              <Label htmlFor="score">Score / Temps</Label>
               <TextInput
+                id="score"
+                name="score"
+                ref={scoreRef}
                 value={score}
                 onChange={(e) => setScore(e.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder={state.scoreMode === "lower" ? "Ex.: 17.243 ou 00:17.243" : "Ex.: 86.5"}
+                aria-invalid={scoreInvalid || undefined}
+                className={scoreInvalid ? "border-red-500 ring-1 ring-red-500/40 focus:ring-red-500" : ""}
               />
+              {scoreInvalid && (
+                <div className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  Score non reconnu. Utilisez un nombre (ex.&nbsp;87.5) ou un temps mm:ss.mmm (ex.&nbsp;00:17.243).
+                </div>
+              )}
             </div>
             <div>
-              <Button  onClick={addEntry} disabled={!name.trim() || !score.trim()}>
-                <PlusCircleIcon className="w-5 h-5 inline-block mr-1 -mt-0.5" />
-                Ajouter l'entrée</Button>
+              <Button onClick={submitEntry} disabled={!canSubmit}>
+                {editingId ? (
+                  <>
+                    <CheckIcon className="w-5 h-5 inline-block mr-1 -mt-0.5" />
+                    Enregistrer
+                  </>
+                ) : (
+                  <>
+                    <PlusCircleIcon className="w-5 h-5 inline-block mr-1 -mt-0.5" />
+                    Ajouter l'entrée
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </Card>
@@ -156,7 +245,12 @@ export default function ControlView() {
             <div className="flex justify-between">
             <h2 className="text-lg font-semibold mb-3">Toutes les entrées</h2>
             </div>
-            <EntriesTable entries={state.entries} scoreMode={state.scoreMode} onRemove={remove} />
+            <EntriesTable
+              entries={state.entries}
+              scoreMode={state.scoreMode}
+              onRemove={remove}
+              onEdit={startEdit}
+            />
           </Card>
         </div>
       </div>

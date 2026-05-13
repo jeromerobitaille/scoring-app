@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Menu, shell, dialog } = require("electron");
 const path = require("node:path");
+const { autoUpdater } = require("electron-updater");
 const { createServer } = require("../server/index.cjs");
 
 const isDev = !app.isPackaged;
@@ -144,10 +145,57 @@ function buildMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
+function setupAutoUpdate() {
+  if (isDev) return;
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on("update-available", async (info) => {
+    if (!mainWindow) return;
+    const { response } = await dialog.showMessageBox(mainWindow, {
+      type: "info",
+      title: "Mise à jour disponible",
+      message: `FWST Scoring ${info.version} est disponible.`,
+      detail: "Voulez-vous la télécharger maintenant ? Le téléchargement se fait en arrière-plan et n'interrompra pas votre travail.",
+      buttons: ["Télécharger", "Plus tard"],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (response === 0) {
+      autoUpdater.downloadUpdate().catch((err) => {
+        console.error("[fwst-scoring] downloadUpdate failed:", err);
+      });
+    }
+  });
+
+  autoUpdater.on("update-downloaded", async () => {
+    if (!mainWindow) return;
+    const { response } = await dialog.showMessageBox(mainWindow, {
+      type: "info",
+      title: "Mise à jour prête",
+      message: "La mise à jour a été téléchargée.",
+      detail: "Redémarrer maintenant pour l'installer ? Sinon, elle s'installera au prochain démarrage.",
+      buttons: ["Redémarrer maintenant", "Plus tard"],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (response === 0) autoUpdater.quitAndInstall();
+  });
+
+  autoUpdater.on("error", (err) => {
+    console.error("[fwst-scoring] Auto-update error:", err?.message || err);
+  });
+
+  autoUpdater.checkForUpdates().catch((err) => {
+    console.error("[fwst-scoring] checkForUpdates failed:", err?.message || err);
+  });
+}
+
 app.whenReady().then(async () => {
   await startServer();
   buildMenu();
   createWindow();
+  setupAutoUpdate();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

@@ -1,21 +1,8 @@
 import { createRequire } from "node:module";
-import os from "node:os";
 
 const require = createRequire(import.meta.url);
 const { attachHub } = require("../server/hub.cjs");
-
-function getLanAddresses() {
-  const nets = os.networkInterfaces();
-  const out = [];
-  for (const name of Object.keys(nets)) {
-    for (const ni of nets[name] || []) {
-      if (ni.family === "IPv4" && !ni.internal) {
-        out.push({ iface: name, address: ni.address });
-      }
-    }
-  }
-  return out;
-}
+const { getLanAddresses } = require("../server/net.cjs");
 
 export default function localHubPlugin(path = "/live-score") {
   return {

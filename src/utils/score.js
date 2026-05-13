@@ -20,7 +20,7 @@ export function formatScore(raw, mode) {
 
     // < 60 s → "s.mmm" (sans "00:")
     if (total < 60) {
-      return total.toFixed(3); // ex: "7.897" ou "0.532"
+      return total.toFixed(3);
     }
 
     // ≥ 60 s → "mm:ss.mmm"
@@ -29,7 +29,6 @@ export function formatScore(raw, mode) {
     let secInt = Math.floor(secondsFloat);
     let ms = Math.round((secondsFloat - secInt) * 1000);
 
-    // Gestion des reports (ex: 59.999 → 60.000)
     if (ms === 1000) {
       ms = 0;
       secInt += 1;
@@ -51,27 +50,58 @@ export function formatScore(raw, mode) {
   return Intl.NumberFormat(undefined, { maximumFractionDigits: 3 }).format(n);
 }
 
-
 export function detectIsTimeString(s) {
   return typeof s === "string" && s.includes(":");
 }
 
-export function computeRanking(entries, scoreMode) {
-  const valid = entries.filter((e) => e.parsed != null);
-  valid.sort((a, b) => (scoreMode === "higher" ? (b.parsed - a.parsed) : (a.parsed - b.parsed)));
-  return valid;
+// Convenience helper that resolves the display mode for a single entry,
+// avoiding the operator-precedence pitfall of `e.timeHint || scoreMode === "lower"`.
+export function entryDisplayMode(entry, scoreMode) {
+  return (entry?.timeHint || scoreMode === "lower") ? "time" : null;
 }
 
-// Dev self-tests (non-bloquants)
-(function devTests() {
+// Competition ranking ("1224"): tied entries share the same rank, the next
+// entry skips ahead by the number of tied entries. Returned entries carry a
+// `.rank` field for direct rendering.
+export function computeRanking(entries, scoreMode) {
+  const valid = entries.filter((e) => e.parsed != null);
+  const sorted = [...valid].sort((a, b) =>
+    scoreMode === "higher" ? (b.parsed - a.parsed) : (a.parsed - b.parsed)
+  );
+
+  let lastValue = null;
+  let lastRank = 0;
+  return sorted.map((e, i) => {
+    const rank = (lastValue !== null && e.parsed === lastValue) ? lastRank : i + 1;
+    lastValue = e.parsed;
+    lastRank = rank;
+    return { ...e, rank };
+  });
+}
+
+// Dev self-tests — gated so they never run in production builds.
+if (import.meta.env?.DEV) {
   try {
     const approxEq = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
     console.assert(parseScore("00:07.321") !== null, "parseScore time should parse");
     console.assert(approxEq(parseScore("00:07.321"), 7.321), "parseScore mm:ss.mmm to seconds");
     console.assert(parseScore("87.5") === 87.5, "parseScore numeric");
-    console.assert(formatScore(7.321, "time").startsWith("00:"), "formatScore time mm:ss.mmm");
+    console.assert(formatScore(7.321, "time").startsWith("0") || formatScore(7.321, "time").startsWith("7"),
+      "formatScore time formats numerically");
     console.assert(formatScore(87.5).includes("87"), "formatScore number");
+
+    const tied = computeRanking(
+      [
+        { id: "a", parsed: 90 },
+        { id: "b", parsed: 85 },
+        { id: "c", parsed: 85 },
+        { id: "d", parsed: 80 },
+      ],
+      "higher"
+    );
+    console.assert(tied[0].rank === 1 && tied[1].rank === 2 && tied[2].rank === 2 && tied[3].rank === 4,
+      "competition ranking with ties");
   } catch (e) {
     console.warn("Dev tests encountered an issue:", e);
   }
-})();
+}

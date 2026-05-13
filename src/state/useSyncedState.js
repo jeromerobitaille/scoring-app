@@ -48,17 +48,19 @@ export default function useSyncedState() {
   // Sauvegarde locale
   useEffect(() => saveState(state), [state]);
 
-  // Abonnement
+  // Abonnement — utilise un setState fonctionnel pour comparer au state le plus
+  // récent (pas le snapshot capturé à la souscription).
   useEffect(() => {
     if (params.useNet) {
       const sock = new LocalSocket(wsURL, params.roomId);
       sockRef.current = sock;
       sock.connect();
       const off = sock.on((remote) => {
-        if (JSON.stringify(remote) !== JSON.stringify(state)) {
-          setState(remote);
+        setState((prev) => {
+          if (JSON.stringify(prev) === JSON.stringify(remote)) return prev;
           saveState(remote);
-        }
+          return remote;
+        });
       });
       return () => { off(); sock.close(); };
     }
@@ -70,7 +72,7 @@ export default function useSyncedState() {
       }
     });
     return off;
-  }, [params.useNet, params.roomId, wsURL]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [params.useNet, params.roomId, wsURL]);
 
   // push: local + diffuse
   const push = (next) => {

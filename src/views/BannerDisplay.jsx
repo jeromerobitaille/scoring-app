@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import useSyncedState from "../state/useSyncedState";
-import { computeRanking, formatScore } from "../utils/score";
+import { computeRanking, formatScore, entryDisplayMode } from "../utils/score";
 import bannerLogo from "../assets/banner.jpg";
 import logo from "../assets/logo.png";
 
@@ -68,11 +68,8 @@ export default function BannerDisplay() {
                 const idx = ranked.findIndex((r) => r.id === e.id);
                 if (idx !== -1 && idx < bestIdx) { best = e; bestIdx = idx; }
             }
-            const scoreText = formatScore(
-                best.parsed,
-                best.timeHint || (state.scoreMode === "lower" ? "time" : null)
-            );
-            setBreaking({ id: best.id, name: best.name, scoreText, rank: bestIdx + 1 });
+            const scoreText = formatScore(best.parsed, entryDisplayMode(best, state.scoreMode));
+            setBreaking({ id: best.id, name: best.name, scoreText, rank: best.rank });
             unseen.forEach((e) => seenIdsRef.current.add(e.id));
             const t = setTimeout(() => setBreaking(null), BREAKING_MS);
             return () => clearTimeout(t);
@@ -81,12 +78,8 @@ export default function BannerDisplay() {
         for (const e of ranked) {
             const prev = lastParsedRef.current.get(e.id);
             if (prev !== undefined && prev !== e.parsed && e.parsed != null) {
-                const idx = ranked.findIndex((r) => r.id === e.id);
-                const scoreText = formatScore(
-                    e.parsed,
-                    e.timeHint || (state.scoreMode === "lower" ? "time" : null)
-                );
-                setBreaking({ id: e.id, name: e.name, scoreText, rank: idx + 1 });
+                const scoreText = formatScore(e.parsed, entryDisplayMode(e, state.scoreMode));
+                setBreaking({ id: e.id, name: e.name, scoreText, rank: e.rank });
                 const t = setTimeout(() => setBreaking(null), BREAKING_MS);
                 lastParsedRef.current.set(e.id, e.parsed);
                 return () => clearTimeout(t);
@@ -185,8 +178,7 @@ export default function BannerDisplay() {
                                 );
                             }
 
-                            const absoluteIndex = ranked.findIndex((r) => r.id === e.id);
-                            const displayRank = absoluteIndex + 1;
+                            const displayRank = e.rank;
 
                             const chipRadius = Math.round(18 * unit);
                             const nameLineHeight = Math.round(nameSize * 1.06);
@@ -277,10 +269,7 @@ export default function BannerDisplay() {
                                             }}
                                         >
                                             <span>
-                                                {formatScore(
-                                                    e.parsed,
-                                                    e.timeHint || (state.scoreMode === "lower" ? "time" : null)
-                                                )}
+                                                {formatScore(e.parsed, entryDisplayMode(e, state.scoreMode))}
                                             </span>
                                             <span style={{ fontSize: `${Math.round(scoreSize * 0.35)}px`, opacity: 0.7 }}>
                                                 {state.scoreMode === "lower" || e.timeHint ? "sec" : "pts"}

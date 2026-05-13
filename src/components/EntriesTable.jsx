@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
-import { computeRanking, formatScore } from "../utils/score";
+import { computeRanking, formatScore, entryDisplayMode } from "../utils/score";
 
-export default function EntriesTable({ entries, scoreMode, onRemove }) {
+export default function EntriesTable({ entries, scoreMode, onRemove, onEdit }) {
   const ranked = useMemo(() => computeRanking(entries, scoreMode), [entries, scoreMode]);
 
   return (
@@ -17,16 +17,23 @@ export default function EntriesTable({ entries, scoreMode, onRemove }) {
           </tr>
         </thead>
         <tbody>
-          {ranked.map((e, idx) => (
+          {ranked.map((e) => (
             <tr key={e.id} className="border-b border-zinc-100 dark:border-zinc-800">
-              <td className="py-2 pr-2 w-10">{idx + 1}</td>
+              <td className="py-2 pr-2 w-10 tabular-nums">{e.rank}</td>
               <td className="py-2 pr-2">{e.name}</td>
-              <td className="py-2 pr-2">
-                {formatScore(e.parsed, e.timeHint || scoreMode === "lower" ? "time" : null)}
+              <td className="py-2 pr-2 tabular-nums">
+                {formatScore(e.parsed, entryDisplayMode(e, scoreMode))}
               </td>
               <td className="py-2 pr-2 text-zinc-500">{e.raw || ""}</td>
-              <td className="py-2 pr-2 text-right">
-                <button className="text-red-600 hover:underline" onClick={() => onRemove(e.id)}>Supprimer</button>
+              <td className="py-2 pr-2 text-right space-x-3">
+                {onEdit && (
+                  <button className="text-blue-600 hover:underline" onClick={() => onEdit(e.id)}>
+                    Modifier
+                  </button>
+                )}
+                <button className="text-red-600 hover:underline" onClick={() => onRemove(e.id)}>
+                  Supprimer
+                </button>
               </td>
             </tr>
           ))}
