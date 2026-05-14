@@ -260,11 +260,11 @@ export default function ControlView() {
 
         {/* Formulaire principal */}
         <Card>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between gap-3 mb-3">
             <h2 className="text-lg font-semibold">
               {editingId ? "Modifier l'entrée" : "Ajouter une entrée"}
             </h2>
-            {editingId && (
+            {editingId ? (
               <button
                 type="button"
                 onClick={resetForm}
@@ -273,6 +273,10 @@ export default function ControlView() {
                 <XMarkIcon className="w-4 h-4 mr-1" />
                 Annuler (Échap)
               </button>
+            ) : (
+              <span className="text-xs opacity-50 hidden sm:inline">
+                Entrée pour valider
+              </span>
             )}
           </div>
           <div className="grid md:grid-cols-12 gap-3 items-end">
@@ -308,11 +312,6 @@ export default function ControlView() {
                 aria-invalid={scoreInvalid || undefined}
                 className={scoreInvalid ? "border-red-500 ring-1 ring-red-500/40 focus:ring-red-500" : ""}
               />
-              {scoreInvalid && (
-                <div className="mt-1 text-xs text-red-600 dark:text-red-400">
-                  Format invalide. Utilisez un nombre (87.5) ou mm:ss.mmm (00:17.243).
-                </div>
-              )}
             </div>
             <div className="md:col-span-3">
               <Button onClick={submitEntry} disabled={!canSubmit} className="w-full">
@@ -328,11 +327,13 @@ export default function ControlView() {
                   </>
                 )}
               </Button>
-              <p className="mt-1 text-[11px] opacity-60 text-center">
-                Entrée pour valider · Échap pour annuler
-              </p>
             </div>
           </div>
+          {scoreInvalid && (
+            <div className="mt-2 text-xs text-red-600 dark:text-red-400">
+              Format invalide. Utilisez un nombre (87.5) ou mm:ss.mmm (00:17.243).
+            </div>
+          )}
         </Card>
 
         {/* Table pleine largeur */}
