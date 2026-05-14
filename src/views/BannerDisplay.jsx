@@ -7,13 +7,23 @@ import logo from "../assets/logo.png";
 
 const BREAKING_MS = 5000;
 
+const FALLBACK_BANNER = {
+    width: 2592, height: 216,
+    nameScale: 1, scoreScale: 1,
+    pageSize: 3, showLogo: true,
+};
+
 export default function BannerDisplay() {
     const [state] = useSyncedState();
     const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
-    const wParam = params?.get("w") ? Number(params.get("w")) : state.bannerWidth;
-    const hParam = params?.get("h") ? Number(params.get("h")) : state.bannerHeight;
 
-    const containerW = Math.max(1920, wParam || 0);
+    const bid = Math.min(1, Math.max(0, Number(params?.get("bid")) || 0));
+    const banner = state.banners?.[bid] ?? state.banners?.[0] ?? FALLBACK_BANNER;
+
+    const wParam = params?.get("w") ? Number(params.get("w")) : banner.width;
+    const hParam = params?.get("h") ? Number(params.get("h")) : banner.height;
+
+    const containerW = Math.max(320, wParam || 0);
     const containerH = Math.max(64, hParam || 0);
     const unit = containerH / 216;
 
@@ -31,13 +41,13 @@ export default function BannerDisplay() {
         return "linear-gradient(135deg,#2f2f2f 0%,#3a3a3a 100%)";
     };
 
-    // Pagination en groupes de 3 — colonnes fixes
-    const pageSize = 3;
+    // Pagination en colonnes fixes — taille de page configurable par bandeau
+    const pageSize = Math.min(6, Math.max(1, Number(banner.pageSize) || 3));
     const pages = useMemo(() => {
         const out = [];
         for (let i = 0; i < ranked.length; i += pageSize) out.push(ranked.slice(i, i + pageSize));
         return out;
-    }, [ranked]);
+    }, [ranked, pageSize]);
 
     const pageCount = pages.length || 1;
     const [pageIndex, setPageIndex] = useState(0);
@@ -99,12 +109,13 @@ export default function BannerDisplay() {
     const chipPY = `${Math.round(36 * unit)}px`;
     const sep = `${Math.round(16 * unit)}px`;
 
-    const nameScale  = Number(state.bannerNameScale ?? 1);
-  const scoreScale = Number(state.bannerScoreScale ?? 1);
+    const nameScale  = Number(banner.nameScale ?? 1);
+    const scoreScale = Number(banner.scoreScale ?? 1);
 
-  const nameSize  = Math.max(10, Math.round(nameSizeBase  * nameScale));
-  const scoreSize = Math.max(10, Math.round(scoreSizeBase * scoreScale));
+    const nameSize  = Math.max(10, Math.round(nameSizeBase  * nameScale));
+    const scoreSize = Math.max(10, Math.round(scoreSizeBase * scoreScale));
 
+    const showLogo = banner.showLogo !== false;
 
     if (ranked.length === 0) {
         return (
@@ -117,11 +128,26 @@ export default function BannerDisplay() {
                     top: 0, left: 0, overflow: "hidden", boxSizing: "border-box",
                 }}
             >
-                <img
-                    src={bannerLogo}
-                    alt="Festival Western de St-Tite"
-                    style={{ height: `${logoHCentered}px`, width: "auto", objectFit: "contain" }}
-                />
+                {showLogo ? (
+                    <img
+                        src={bannerLogo}
+                        alt="Festival Western de St-Tite"
+                        style={{ height: `${logoHCentered}px`, width: "auto", objectFit: "contain" }}
+                    />
+                ) : (
+                    <div
+                        style={{
+                            color: "rgba(255,255,255,0.85)",
+                            fontWeight: 800,
+                            fontSize: Math.round(72 * unit),
+                            letterSpacing: "0.02em",
+                            textAlign: "center",
+                            padding: `0 ${Math.round(40 * unit)}px`,
+                        }}
+                    >
+                        {state.eventName?.trim() || "En attente des résultats…"}
+                    </div>
+                )}
             </div>
         );
     }
@@ -146,14 +172,16 @@ export default function BannerDisplay() {
                     "radial-gradient(120% 100% at 0% 50%, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0) 60%), linear-gradient(180deg,#000,#0b0b0b)",
             }}
         >
-            {/* Logo gauche (largeur auto) */}
-            <div className="flex items-center h-full" style={{ marginRight: gap }}>
-                <img
-                    src={logo}
-                    alt="Festival Western de St-Tite"
-                    style={{ height: `${logoHLeft}px`, width: "auto", objectFit: "contain" }}
-                />
-            </div>
+            {/* Logo gauche (largeur auto) — masquable via Paramètres > Bandeau */}
+            {showLogo && (
+                <div className="flex items-center h-full" style={{ marginRight: gap }}>
+                    <img
+                        src={logo}
+                        alt="Festival Western de St-Tite"
+                        style={{ height: `${logoHLeft}px`, width: "auto", objectFit: "contain" }}
+                    />
+                </div>
+            )}
 
             {/* Grille fixe 3 colonnes (positions stables) */}
             <div style={{ position: "relative", flex: 1, minWidth: 0 }}>

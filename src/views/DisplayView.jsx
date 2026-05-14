@@ -57,11 +57,13 @@ export default function DisplayView() {
 
      
       <div className="relative mx-auto w-full max-w-7xl flex items-center justify-center">
-        <img
-          src={logo}
-          alt="Festival Western de St-Tite"
-          className="absolute left-0 h-24 w-auto"
-        />
+        {state.showDisplayLogo !== false && (
+          <img
+            src={logo}
+            alt="Festival Western de St-Tite"
+            className="absolute left-0 h-24 w-auto"
+          />
+        )}
         <h1 className="text-4xl md:text-6xl font-black tracking-tight text-center">
           {state.eventName}
         </h1>

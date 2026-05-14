@@ -77,39 +77,48 @@ function QrTab() {
   return <ShareConnection />;
 }
 
-function BannerTab({ state, push }) {
-  const setBannerWidth  = (v) => push({ ...state, bannerWidth:  Math.max(320, Number(v) || 0) });
-  const setBannerHeight = (v) => push({ ...state, bannerHeight: Math.max(64,  Number(v) || 0) });
-  const setNameScale    = (v) => push({ ...state, bannerNameScale:  Math.min(2, Math.max(0.6, Number(v) || 1)) });
-  const setScoreScale   = (v) => push({ ...state, bannerScoreScale: Math.min(2, Math.max(0.6, Number(v) || 1)) });
+function BannerConfigSection({ banner, index, state, push }) {
+  const updateBanner = (patch) => {
+    const next = state.banners.map((b, i) => (i === index ? { ...b, ...patch } : b));
+    push({ ...state, banners: next });
+  };
 
   function openBanner() {
     const url = new URL(window.location.href);
     url.searchParams.delete("settings");
     url.searchParams.set("banner", "1");
-    url.searchParams.set("w", String(state.bannerWidth));
-    url.searchParams.set("h", String(state.bannerHeight));
+    url.searchParams.set("bid", String(index));
+    url.searchParams.set("w", String(banner.width));
+    url.searchParams.set("h", String(banner.height));
     const w = window.open(
       url.toString(),
-      "rodeo-banner",
-      `noopener,noreferrer,width=${state.bannerWidth},height=${state.bannerHeight}`
+      `rodeo-banner-${index}`,
+      `noopener,noreferrer,width=${banner.width},height=${banner.height}`
     );
     bus?.post({ type: "sync:update", payload: state });
     w?.focus();
   }
 
+  const id = (suffix) => `b${index}-${suffix}`;
+
   return (
-    <Card>
+    <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4">
       <div className="flex items-start justify-between gap-4 mb-4">
-        <div>
-          <h2 className="text-lg font-semibold">Bandeau LED</h2>
-          <p className="text-sm opacity-70">
-            Résolution exacte du bandeau (px) et échelle des polices.
+        <div className="flex-1 min-w-0">
+          <input
+            type="text"
+            value={banner.label}
+            onChange={(e) => updateBanner({ label: e.target.value })}
+            className="text-base font-semibold bg-transparent border-0 border-b border-transparent hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-zinc-500 focus:outline-none px-0 py-0.5 w-full"
+            aria-label="Nom du bandeau"
+          />
+          <p className="text-xs opacity-60 mt-1">
+            {banner.width} × {banner.height} px · {banner.pageSize} entrée{banner.pageSize > 1 ? "s" : ""} par page
           </p>
         </div>
         <Button onClick={openBanner}>
           <TvIcon className="w-5 h-5 inline-block mr-1.5 -mt-0.5" />
-          Ouvrir le bandeau
+          Ouvrir
         </Button>
       </div>
 
@@ -117,63 +126,111 @@ function BannerTab({ state, push }) {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="bw">Largeur (px)</Label>
+              <Label htmlFor={id("w")}>Largeur (px)</Label>
               <TextInput
-                id="bw"
+                id={id("w")}
                 type="number"
-                value={state.bannerWidth}
-                onChange={(e) => setBannerWidth(e.target.value)}
+                value={banner.width}
+                onChange={(e) => updateBanner({ width: Math.max(320, Number(e.target.value) || 0) })}
                 inputMode="numeric"
               />
             </div>
             <div>
-              <Label htmlFor="bh">Hauteur (px)</Label>
+              <Label htmlFor={id("h")}>Hauteur (px)</Label>
               <TextInput
-                id="bh"
+                id={id("h")}
                 type="number"
-                value={state.bannerHeight}
-                onChange={(e) => setBannerHeight(e.target.value)}
+                value={banner.height}
+                onChange={(e) => updateBanner({ height: Math.max(64, Number(e.target.value) || 0) })}
                 inputMode="numeric"
               />
             </div>
           </div>
 
           <div>
-            <Label htmlFor="nameScale">
-              Taille du nom — {Number(state.bannerNameScale ?? 1).toFixed(2)}×
+            <Label htmlFor={id("pageSize")}>
+              Entrées par page — {banner.pageSize}
             </Label>
             <input
-              id="nameScale"
+              id={id("pageSize")}
               type="range"
-              min="0.6" max="2" step="0.05"
-              value={state.bannerNameScale ?? 1}
-              onChange={(e) => setNameScale(e.target.value)}
+              min="1" max="6" step="1"
+              value={banner.pageSize}
+              onChange={(e) => updateBanner({ pageSize: Number(e.target.value) })}
               className="w-full mt-1"
             />
           </div>
 
           <div>
-            <Label htmlFor="scoreScale">
-              Taille du score — {Number(state.bannerScoreScale ?? 1).toFixed(2)}×
+            <Label htmlFor={id("nameScale")}>
+              Taille du nom — {Number(banner.nameScale).toFixed(2)}×
             </Label>
             <input
-              id="scoreScale"
+              id={id("nameScale")}
               type="range"
               min="0.6" max="2" step="0.05"
-              value={state.bannerScoreScale ?? 1}
-              onChange={(e) => setScoreScale(e.target.value)}
+              value={banner.nameScale}
+              onChange={(e) => updateBanner({ nameScale: Math.min(2, Math.max(0.6, Number(e.target.value))) })}
               className="w-full mt-1"
             />
           </div>
+
+          <div>
+            <Label htmlFor={id("scoreScale")}>
+              Taille du score — {Number(banner.scoreScale).toFixed(2)}×
+            </Label>
+            <input
+              id={id("scoreScale")}
+              type="range"
+              min="0.6" max="2" step="0.05"
+              value={banner.scoreScale}
+              onChange={(e) => updateBanner({ scoreScale: Math.min(2, Math.max(0.6, Number(e.target.value))) })}
+              className="w-full mt-1"
+            />
+          </div>
+
+          <label className="flex items-center gap-2 select-none cursor-pointer">
+            <input
+              type="checkbox"
+              checked={banner.showLogo !== false}
+              onChange={(e) => updateBanner({ showLogo: e.target.checked })}
+              className="w-4 h-4"
+            />
+            <span className="text-sm">Afficher le logo Festival Western</span>
+          </label>
         </div>
 
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
           <div className="text-xs opacity-60 mb-2">Aperçu des proportions</div>
-          <BannerPreview width={state.bannerWidth} height={state.bannerHeight} />
-          <div className="text-[11px] opacity-50 mt-3 text-center max-w-xs">
-            Astuce : URL personnalisée <code>?banner=1&amp;w=2592&amp;h=216</code>
-          </div>
+          <BannerPreview width={banner.width} height={banner.height} />
         </div>
+      </div>
+    </div>
+  );
+}
+
+function BannerTab({ state, push }) {
+  const banners = state.banners ?? [];
+  return (
+    <Card>
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold">Bandeaux LED</h2>
+        <p className="text-sm opacity-70">
+          Deux bandeaux indépendants — chacun avec sa propre résolution, son nombre
+          d'entrées par page, et sa fenêtre. Utile par exemple pour un grand bandeau
+          d'arène et un second plus petit en régie.
+        </p>
+      </div>
+      <div className="space-y-4">
+        {banners.map((b, i) => (
+          <BannerConfigSection
+            key={b.id || i}
+            banner={b}
+            index={i}
+            state={state}
+            push={push}
+          />
+        ))}
       </div>
     </Card>
   );
@@ -261,6 +318,16 @@ function TableTab({ state, push }) {
               className="w-4 h-4"
             />
             <span className="text-sm">Afficher les points de pagination</span>
+          </label>
+
+          <label className="flex items-center gap-2 select-none cursor-pointer">
+            <input
+              type="checkbox"
+              checked={state.showDisplayLogo !== false}
+              onChange={(e) => push({ ...state, showDisplayLogo: e.target.checked })}
+              className="w-4 h-4"
+            />
+            <span className="text-sm">Afficher le logo Festival Western</span>
           </label>
         </div>
 
