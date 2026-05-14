@@ -7,11 +7,11 @@ import TextInput from "../components/ui/TextInput";
 import Tabs from "../components/ui/Tabs";
 import { bus } from "../sync/SyncBus";
 import {
-  ArrowLeftIcon,
   ComputerDesktopIcon,
   TvIcon,
   QrCodeIcon,
 } from "@heroicons/react/24/outline";
+import { ArrowLeftIcon } from "@heroicons/react/24/solid";
 import ShareConnection from "../components/ShareConnection";
 
 function BannerPreview({ width, height }) {
@@ -302,14 +302,19 @@ export default function SettingsView() {
     <div className="min-h-screen bg-gradient-to-b from-zinc-100 to-zinc-200 dark:from-zinc-950 dark:to-zinc-900 text-zinc-900 dark:text-zinc-100 p-6">
       <div className="mx-auto max-w-5xl space-y-5">
 
-        <header className="flex items-center justify-between gap-4">
-          <Button onClick={goToScoring}>
-            <ArrowLeftIcon className="w-5 h-5 inline-block mr-1.5 -mt-0.5" />
-            Retour au scoring
-          </Button>
-          <div className="text-right">
-            <h1 className="text-2xl font-bold">Paramètres &amp; sorties</h1>
-            <p className="text-xs opacity-70">Configuration des affichages secondaires.</p>
+        <header className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={goToScoring}
+            aria-label="Retour au scoring"
+            title="Retour au scoring"
+            className="p-2 rounded-xl hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 cursor-pointer flex-shrink-0"
+          >
+            <ArrowLeftIcon className="w-5 h-5" />
+          </button>
+          <div className="min-w-0">
+            <h1 className="text-xl md:text-2xl font-bold leading-tight">Paramètres &amp; sorties</h1>
+            <p className="text-xs opacity-60">Configuration des affichages secondaires.</p>
           </div>
         </header>
 
