@@ -15,6 +15,10 @@ const DEFAULT_STATE = {
   bannerHeight: 216,
   bannerNameScale: 1.0,
   bannerScoreScale: 1.0,
+  // Tableau plein écran
+  displayPageSize: 5,           // entries per page (1–10)
+  displayRotationMs: 5000,      // ms between auto-rotations; 0 disables rotation
+  displayShowPagination: true,  // show the dot indicators
 };
 
 export default function useSyncedState() {
@@ -25,6 +29,9 @@ export default function useSyncedState() {
       ...saved,
       bannerNameScale: Number(saved.bannerNameScale ?? 1.0),
       bannerScoreScale: Number(saved.bannerScoreScale ?? 1.0),
+      displayPageSize: Math.min(10, Math.max(1, Number(saved.displayPageSize ?? DEFAULT_STATE.displayPageSize))),
+      displayRotationMs: Math.max(0, Number(saved.displayRotationMs ?? DEFAULT_STATE.displayRotationMs)),
+      displayShowPagination: saved.displayShowPagination ?? DEFAULT_STATE.displayShowPagination,
     };
   });
   const params = useMemo(() => {

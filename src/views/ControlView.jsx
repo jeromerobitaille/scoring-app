@@ -218,11 +218,16 @@ export default function ControlView() {
               <p className="text-xs opacity-60">Saisie des pointages</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button onClick={openSettings}>
-              <Cog6ToothIcon className="w-5 h-5 inline-block mr-1 -mt-0.5" />
-              Paramètres
-            </Button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={openSettings}
+              aria-label="Paramètres"
+              title="Paramètres"
+              className="p-2 rounded-xl hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 cursor-pointer"
+            >
+              <Cog6ToothIcon className="w-5 h-5" />
+            </button>
             <KebabMenu onClearAll={clearAll} />
           </div>
         </header>

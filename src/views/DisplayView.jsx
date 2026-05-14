@@ -25,23 +25,26 @@ export default function DisplayView() {
   );
 
 
-  const pageSize = 5;
+  const pageSize = Math.min(10, Math.max(1, Number(state.displayPageSize) || 5));
+  const rotationMs = Math.max(0, Number(state.displayRotationMs ?? 5000));
+  const showPagination = state.displayShowPagination !== false;
+
   const pages = useMemo(() => {
     const out = [];
     for (let i = 0; i < ranked.length; i += pageSize) {
       out.push(ranked.slice(i, i + pageSize));
     }
     return out;
-  }, [ranked]);
+  }, [ranked, pageSize]);
 
   const pageCount = pages.length || 1;
   const [pageIndex, setPageIndex] = useState(0);
 
   useEffect(() => {
-    if (pageCount <= 1) return;
-    const id = setInterval(() => setPageIndex((p) => (p + 1) % pageCount), 5000);
+    if (pageCount <= 1 || rotationMs <= 0) return;
+    const id = setInterval(() => setPageIndex((p) => (p + 1) % pageCount), rotationMs);
     return () => clearInterval(id);
-  }, [pageCount]);
+  }, [pageCount, rotationMs]);
 
   useEffect(() => {
     if (pageIndex >= pageCount) setPageIndex(0);
@@ -128,7 +131,7 @@ export default function DisplayView() {
         </AnimatePresence>
 
      
-        {pageCount > 1 && (
+        {pageCount > 1 && showPagination && (
           <div className="mt-3 w-full flex justify-center gap-2">
             {Array.from({ length: pageCount }).map((_, i) => (
               <div
