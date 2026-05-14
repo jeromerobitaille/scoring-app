@@ -6,6 +6,7 @@ import Card from "../components/ui/Card";
 import Label from "../components/ui/Label";
 import TextInput from "../components/ui/TextInput";
 import EntriesTable from "../components/EntriesTable";
+import ThemeToggle from "../components/ui/ThemeToggle";
 import {
   Cog6ToothIcon,
   EllipsisVerticalIcon,
@@ -119,6 +120,11 @@ export default function ControlView() {
     document.title = state.eventName ? `${base} — ${state.eventName}` : base;
   }, [state.eventName]);
 
+  // Apply theme to body
+  useEffect(() => {
+    document.body.classList.toggle("dark", state.theme !== "light");
+  }, [state.theme]);
+
   // Autofocus name on mount
   useEffect(() => { nameRef.current?.focus(); }, []);
 
@@ -219,6 +225,10 @@ export default function ControlView() {
             </div>
           </div>
           <div className="flex items-center gap-1">
+            <ThemeToggle
+              theme={state.theme}
+              onChange={(t) => push({ ...state, theme: t })}
+            />
             <button
               type="button"
               onClick={openSettings}

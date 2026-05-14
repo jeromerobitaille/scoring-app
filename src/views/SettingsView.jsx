@@ -13,6 +13,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { ArrowLeftIcon } from "@heroicons/react/24/solid";
 import ShareConnection from "../components/ShareConnection";
+import ThemeToggle from "../components/ui/ThemeToggle";
 
 function BannerPreview({ width, height }) {
   const w = Math.max(1, Number(width) || 0);
@@ -302,20 +303,26 @@ export default function SettingsView() {
     <div className="min-h-screen bg-gradient-to-b from-zinc-100 to-zinc-200 dark:from-zinc-950 dark:to-zinc-900 text-zinc-900 dark:text-zinc-100 p-6">
       <div className="mx-auto max-w-5xl space-y-5">
 
-        <header className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={goToScoring}
-            aria-label="Retour au scoring"
-            title="Retour au scoring"
-            className="p-2 rounded-xl hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 cursor-pointer flex-shrink-0"
-          >
-            <ArrowLeftIcon className="w-5 h-5" />
-          </button>
-          <div className="min-w-0">
-            <h1 className="text-xl md:text-2xl font-bold leading-tight">Paramètres &amp; sorties</h1>
-            <p className="text-xs opacity-60">Configuration des affichages secondaires.</p>
+        <header className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              type="button"
+              onClick={goToScoring}
+              aria-label="Retour au scoring"
+              title="Retour au scoring"
+              className="p-2 rounded-xl hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 cursor-pointer flex-shrink-0"
+            >
+              <ArrowLeftIcon className="w-5 h-5" />
+            </button>
+            <div className="min-w-0">
+              <h1 className="text-xl md:text-2xl font-bold leading-tight">Paramètres &amp; sorties</h1>
+              <p className="text-xs opacity-60">Configuration des affichages secondaires.</p>
+            </div>
           </div>
+          <ThemeToggle
+            theme={state.theme}
+            onChange={(t) => push({ ...state, theme: t })}
+          />
         </header>
 
         <div className="flex justify-center">
