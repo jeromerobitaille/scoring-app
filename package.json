@@ -25,7 +25,9 @@
     "electron:make": "npm run build && electron-builder -mw",
     "electron:make:mac": "npm run build && electron-builder --mac",
     "electron:make:win": "npm run build && electron-builder --win",
-    "electron:publish": "npm run build && electron-builder -mw --publish always"
+    "electron:publish:mac": "electron-builder --mac --publish always",
+    "electron:publish:win": "electron-builder --win --publish always",
+    "electron:publish": "npm run build && npm run electron:publish:mac && npm run electron:publish:win"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
