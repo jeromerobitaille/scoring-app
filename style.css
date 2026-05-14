@@ -1,4 +1,11 @@
 @import "tailwindcss";
+
+/* Tailwind v4 defaults to prefers-color-scheme for dark mode.
+   This override makes dark: variants follow the .dark class on <body>,
+   so our in-app theme toggle works on every OS regardless of system
+   preference. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @font-face {
       font-family: 'TexasTango'; /* Choose a descriptive name for your font */
       src: local('TexasTango'), url('./texas_tango.otf') format('opentype');
