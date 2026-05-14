@@ -1,9 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { ChevronDownIcon, ClipboardDocumentIcon, ArrowTopRightOnSquareIcon, CheckIcon } from "@heroicons/react/24/outline";
+import {
+  ChevronDownIcon,
+  ClipboardDocumentIcon,
+  ArrowTopRightOnSquareIcon,
+  CheckIcon,
+  PencilSquareIcon,
+  ComputerDesktopIcon,
+} from "@heroicons/react/24/outline";
 import Card from "./ui/Card";
 
-function buildJoinUrl(host, port, room) {
+function buildBaseUrl(host, port, room) {
   const r = encodeURIComponent(room || "default");
   return `http://${host}:${port}/?net=1&room=${r}`;
 }
@@ -15,8 +22,7 @@ function rankAddress(addr) {
   return 2;
 }
 
-function InterfaceCard({ address, iface, port, room, large }) {
-  const url = buildJoinUrl(address, port, room);
+function EndpointCell({ label, icon: Icon, url, qrSize }) {
   const [copied, setCopied] = useState(false);
 
   async function copy() {
@@ -27,35 +33,59 @@ function InterfaceCard({ address, iface, port, room, large }) {
     } catch {}
   }
 
-  const qrSize = large ? 220 : 140;
-
   return (
-    <div className={`rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/40 p-4 ${large ? "flex flex-col sm:flex-row items-center gap-5" : "flex flex-col items-center gap-3"}`}>
-      <div className="bg-white p-2 rounded-xl flex-shrink-0">
+    <div className="flex flex-col items-center gap-2 min-w-0">
+      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide opacity-80">
+        <Icon className="w-3.5 h-3.5" />
+        {label}
+      </div>
+      <div className="bg-white p-2 rounded-xl">
         <QRCodeSVG value={url} size={qrSize} level="M" includeMargin={false} />
       </div>
-      <div className="flex-1 w-full min-w-0 text-center sm:text-left">
-        <div className="text-xs uppercase tracking-wide opacity-60">{iface}</div>
-        <div className={`font-mono break-all ${large ? "text-base font-semibold" : "text-sm"}`}>{url}</div>
-        <div className="mt-3 flex flex-wrap gap-2 justify-center sm:justify-start">
-          <button
-            type="button"
-            onClick={copy}
-            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
-          >
-            {copied ? <CheckIcon className="w-3.5 h-3.5" /> : <ClipboardDocumentIcon className="w-3.5 h-3.5" />}
-            {copied ? "Copié" : "Copier"}
-          </button>
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
-          >
-            <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5" />
-            Tester dans le navigateur
-          </a>
-        </div>
+      <div className="font-mono text-xs break-all text-center max-w-full opacity-80" style={{ maxWidth: qrSize + 16 }}>
+        {url}
+      </div>
+      <div className="flex gap-1.5">
+        <button
+          type="button"
+          onClick={copy}
+          className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+        >
+          {copied ? <CheckIcon className="w-3 h-3" /> : <ClipboardDocumentIcon className="w-3 h-3" />}
+          {copied ? "Copié" : "Copier"}
+        </button>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+        >
+          <ArrowTopRightOnSquareIcon className="w-3 h-3" />
+          Tester
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function InterfaceCard({ address, iface, port, room, large }) {
+  const base = buildBaseUrl(address, port, room);
+  const qrSize = large ? 200 : 140;
+
+  const endpoints = [
+    { id: "scoring", label: "Saisie",  icon: PencilSquareIcon,    url: base },
+    { id: "display", label: "Tableau", icon: ComputerDesktopIcon, url: `${base}&display=1` },
+  ];
+
+  return (
+    <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/40 p-4">
+      <div className="text-xs uppercase tracking-wide opacity-60 mb-3">
+        {iface} · {address}
+      </div>
+      <div className={`grid gap-5 ${large ? "sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2"}`}>
+        {endpoints.map((e) => (
+          <EndpointCell key={e.id} label={e.label} icon={e.icon} url={e.url} qrSize={qrSize} />
+        ))}
       </div>
     </div>
   );
@@ -112,8 +142,9 @@ export default function ShareConnection() {
       <div className="mb-4">
         <h2 className="text-lg font-semibold">Partage réseau local</h2>
         <p className="text-sm opacity-70">
-          Les juges et écrans secondaires scannent le QR code (ou ouvrent l'URL)
-          depuis le même WiFi local. Room actuelle : <code>{room}</code>
+          Deux liens par interface : <strong>Saisie</strong> pour un opérateur qui
+          entre les scores, <strong>Tableau</strong> pour un écran ou projecteur
+          qui affiche les résultats. Room actuelle : <code>{room}</code>
         </p>
       </div>
 
@@ -138,7 +169,7 @@ export default function ShareConnection() {
           </button>
 
           {showOthers && (
-            <div className="grid sm:grid-cols-2 gap-3">
+            <div className="space-y-3">
               {addresses.slice(1).map((a) => (
                 <InterfaceCard
                   key={a.iface + a.address}
