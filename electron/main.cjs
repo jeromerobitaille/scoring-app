@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, shell, dialog } = require("electron");
+const { app, BrowserWindow, Menu, shell, dialog, ipcMain, screen } = require("electron");
 const path = require("node:path");
 const { autoUpdater } = require("electron-updater");
 const { createServer } = require("../server/index.cjs");
@@ -145,6 +145,72 @@ function buildMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
+// Track auxiliary fullscreen windows so they can be closed on quit
+const auxWindows = new Set();
+
+function describeDisplay(d, idx, primaryId) {
+  const isPrimary = d.id === primaryId;
+  const dim = `${d.bounds.width}×${d.bounds.height}`;
+  const name = d.label || (isPrimary ? "Écran principal" : `Écran ${idx + 1}`);
+  return {
+    id: d.id,
+    label: `${name} — ${dim}${isPrimary ? " (principal)" : ""}`,
+    bounds: d.bounds,
+    workArea: d.workArea,
+    isPrimary,
+    scaleFactor: d.scaleFactor,
+  };
+}
+
+function setupIpc() {
+  ipcMain.handle("displays:list", () => {
+    const all = screen.getAllDisplays();
+    const primaryId = screen.getPrimaryDisplay().id;
+    return all.map((d, i) => describeDisplay(d, i, primaryId));
+  });
+
+  ipcMain.handle("window:openOnDisplay", (_event, args) => {
+    if (!serverInfo) return { ok: false, error: "server-not-ready" };
+    const { url, displayId } = args || {};
+    if (!url) return { ok: false, error: "missing-url" };
+
+    const all = screen.getAllDisplays();
+    const target = all.find((d) => d.id === displayId) || screen.getPrimaryDisplay();
+
+    const finalUrl = url.includes("fs=") ? url : `${url}${url.includes("?") ? "&" : "?"}fs=1`;
+
+    const win = new BrowserWindow({
+      x: target.bounds.x,
+      y: target.bounds.y,
+      width: target.bounds.width,
+      height: target.bounds.height,
+      frame: false,
+      fullscreen: true,
+      backgroundColor: "#000000",
+      autoHideMenuBar: true,
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+        preload: path.join(__dirname, "preload.cjs"),
+      },
+    });
+
+    win.setMenuBarVisibility(false);
+    win.loadURL(finalUrl);
+    auxWindows.add(win);
+    win.on("closed", () => auxWindows.delete(win));
+
+    return { ok: true, displayId: target.id };
+  });
+
+  ipcMain.handle("window:closeSelf", (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win && win !== mainWindow) win.close();
+    return { ok: true };
+  });
+}
+
 function setupAutoUpdate() {
   if (isDev) return;
   autoUpdater.autoDownload = false;
@@ -193,6 +259,7 @@ function setupAutoUpdate() {
 
 app.whenReady().then(async () => {
   await startServer();
+  setupIpc();
   buildMenu();
   createWindow();
   setupAutoUpdate();

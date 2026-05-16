@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import useSyncedState from "../state/useSyncedState";
+import useFullscreenExit from "../hooks/useFullscreenExit";
 import { computeRanking, formatScore, entryDisplayMode } from "../utils/score";
 import logo from "../assets/logo.png";
 
@@ -13,6 +14,7 @@ const rankBadgeBg = (rank) => {
 };
 
 export default function DisplayView() {
+  useFullscreenExit();
   const [state] = useSyncedState();
 
   useEffect(() => {

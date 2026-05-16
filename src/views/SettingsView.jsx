@@ -10,10 +10,14 @@ import {
   ComputerDesktopIcon,
   TvIcon,
   QrCodeIcon,
+  Squares2X2Icon,
+  PlusIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 import { ArrowLeftIcon } from "@heroicons/react/24/solid";
 import ShareConnection from "../components/ShareConnection";
 import ThemeToggle from "../components/ui/ThemeToggle";
+import OutputLauncher from "../components/FullscreenLauncher";
 
 function BannerPreview({ width, height }) {
   const w = Math.max(1, Number(width) || 0);
@@ -83,43 +87,31 @@ function BannerConfigSection({ banner, index, state, push }) {
     push({ ...state, banners: next });
   };
 
-  function openBanner() {
+  const id = (suffix) => `b${index}-${suffix}`;
+
+  function buildBannerUrl() {
     const url = new URL(window.location.href);
     url.searchParams.delete("settings");
     url.searchParams.set("banner", "1");
     url.searchParams.set("bid", String(index));
     url.searchParams.set("w", String(banner.width));
     url.searchParams.set("h", String(banner.height));
-    const w = window.open(
-      url.toString(),
-      `rodeo-banner-${index}`,
-      `noopener,noreferrer,width=${banner.width},height=${banner.height}`
-    );
-    bus?.post({ type: "sync:update", payload: state });
-    w?.focus();
+    return url.toString();
   }
-
-  const id = (suffix) => `b${index}-${suffix}`;
 
   return (
     <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4">
-      <div className="flex items-start justify-between gap-4 mb-4">
-        <div className="flex-1 min-w-0">
-          <input
-            type="text"
-            value={banner.label}
-            onChange={(e) => updateBanner({ label: e.target.value })}
-            className="text-base font-semibold bg-transparent border-0 border-b border-transparent hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-zinc-500 focus:outline-none px-0 py-0.5 w-full"
-            aria-label="Nom du bandeau"
-          />
-          <p className="text-xs opacity-60 mt-1">
-            {banner.width} × {banner.height} px · {banner.pageSize} entrée{banner.pageSize > 1 ? "s" : ""} par page
-          </p>
-        </div>
-        <Button onClick={openBanner}>
-          <TvIcon className="w-5 h-5 inline-block mr-1.5 -mt-0.5" />
-          Ouvrir
-        </Button>
+      <div className="mb-4">
+        <input
+          type="text"
+          value={banner.label}
+          onChange={(e) => updateBanner({ label: e.target.value })}
+          className="text-base font-semibold bg-transparent border-0 border-b border-transparent hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-zinc-500 focus:outline-none px-0 py-0.5 w-full"
+          aria-label="Nom du bandeau"
+        />
+        <p className="text-xs opacity-60 mt-1">
+          {banner.width} × {banner.height} px · {banner.pageSize} entrée{banner.pageSize > 1 ? "s" : ""} par page
+        </p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
@@ -205,6 +197,18 @@ function BannerConfigSection({ banner, index, state, push }) {
           <BannerPreview width={banner.width} height={banner.height} />
         </div>
       </div>
+
+      <div className="mt-4 flex justify-end">
+        <OutputLauncher
+          buildUrl={buildBannerUrl}
+          windowName={`rodeo-banner-${index}`}
+          windowFeatures={`noopener,noreferrer,width=${banner.width},height=${banner.height}`}
+          label="Ouvrir le bandeau"
+          icon={TvIcon}
+          onBeforeLaunch={() => bus?.post({ type: "sync:update", payload: state })}
+          stacked
+        />
+      </div>
     </div>
   );
 }
@@ -244,13 +248,11 @@ function TableTab({ state, push }) {
   const setShowPagination = (v) =>
     push({ ...state, displayShowPagination: !!v });
 
-  function openDisplay() {
+  function buildDisplayUrl() {
     const url = new URL(window.location.href);
     url.searchParams.delete("settings");
     url.searchParams.set("display", "1");
-    const w = window.open(url.toString(), "rodeo-display", "noopener,noreferrer");
-    bus?.post({ type: "sync:update", payload: state });
-    w?.focus();
+    return url.toString();
   }
 
   const rotationSec = Math.round((state.displayRotationMs ?? 5000) / 1000);
@@ -258,18 +260,12 @@ function TableTab({ state, push }) {
 
   return (
     <Card>
-      <div className="flex items-start justify-between gap-4 mb-4">
-        <div>
-          <h2 className="text-lg font-semibold">Tableau plein écran</h2>
-          <p className="text-sm opacity-70">
-            Affichage pour 2<sup>e</sup> écran ou projecteur. Pagination automatique
-            quand il y a plus d'entrées qu'une page.
-          </p>
-        </div>
-        <Button onClick={openDisplay}>
-          <ComputerDesktopIcon className="w-5 h-5 inline-block mr-1.5 -mt-0.5" />
-          Ouvrir l'affichage
-        </Button>
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold">Tableau plein écran</h2>
+        <p className="text-sm opacity-70">
+          Affichage pour 2<sup>e</sup> écran ou projecteur. Pagination automatique
+          quand il y a plus d'entrées qu'une page.
+        </p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
@@ -339,6 +335,320 @@ function TableTab({ state, push }) {
           />
         </div>
       </div>
+
+      <div className="mt-5 flex justify-end">
+        <OutputLauncher
+          buildUrl={buildDisplayUrl}
+          windowName="rodeo-display"
+          label="Ouvrir l'affichage"
+          icon={ComputerDesktopIcon}
+          onBeforeLaunch={() => bus?.post({ type: "sync:update", payload: state })}
+          stacked
+        />
+      </div>
+    </Card>
+  );
+}
+
+function CanvasTab({ state, push }) {
+  const canvas = state.canvas;
+  const [selectedId, setSelectedId] = useState(canvas.banners[0]?.id ?? null);
+  const selected = canvas.banners.find((b) => b.id === selectedId);
+
+  const updateCanvas = (patch) => push({ ...state, canvas: { ...canvas, ...patch } });
+  const updateBanner = (id, patch) => {
+    const next = canvas.banners.map((b) => (b.id === id ? { ...b, ...patch } : b));
+    updateCanvas({ banners: next });
+  };
+  const addBanner = () => {
+    const id = `c-${Math.random().toString(36).slice(2, 8)}`;
+    const newBanner = {
+      id,
+      label: `Bandeau ${canvas.banners.length + 1}`,
+      x: 0,
+      y: 0,
+      width: Math.min(1920, canvas.width),
+      height: Math.min(216, canvas.height),
+      pageSize: 3,
+      nameScale: 1,
+      scoreScale: 1,
+      showLogo: true,
+    };
+    updateCanvas({ banners: [...canvas.banners, newBanner] });
+    setSelectedId(id);
+  };
+  const removeBanner = (id) => {
+    const next = canvas.banners.filter((b) => b.id !== id);
+    updateCanvas({ banners: next });
+    if (selectedId === id) setSelectedId(next[0]?.id ?? null);
+  };
+
+  function buildCanvasUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("settings");
+    url.searchParams.set("canvas", "1");
+    return url.toString();
+  }
+
+  // Preview scaling
+  const MAX_PREVIEW_W = 640;
+  const MAX_PREVIEW_H = 400;
+  const scale = Math.min(MAX_PREVIEW_W / canvas.width, MAX_PREVIEW_H / canvas.height, 0.5);
+  const previewW = Math.max(1, Math.round(canvas.width * scale));
+  const previewH = Math.max(1, Math.round(canvas.height * scale));
+
+  return (
+    <Card>
+      {/* Header */}
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold">Canevas LED</h2>
+        <p className="text-sm opacity-70 mb-3">
+          Une seule fenêtre qui contient plusieurs bandeaux positionnés librement —
+          pratique pour envoyer une image composée à un processeur LED multi-zones.
+        </p>
+        <div className="flex items-end gap-3">
+          <div>
+            <Label htmlFor="cw">Largeur (px)</Label>
+            <TextInput
+              id="cw"
+              type="number"
+              value={canvas.width}
+              onChange={(e) => updateCanvas({ width: Math.max(320, Number(e.target.value) || 0) })}
+              inputMode="numeric"
+              className="!w-28"
+            />
+          </div>
+          <div>
+            <Label htmlFor="ch">Hauteur (px)</Label>
+            <TextInput
+              id="ch"
+              type="number"
+              value={canvas.height}
+              onChange={(e) => updateCanvas({ height: Math.max(64, Number(e.target.value) || 0) })}
+              inputMode="numeric"
+              className="!w-28"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-[220px_1fr] gap-4">
+        {/* Sidebar */}
+        <div className="space-y-2">
+          <div className="text-xs uppercase tracking-wide opacity-60 mb-1">
+            Bandeaux ({canvas.banners.length})
+          </div>
+          {canvas.banners.length === 0 && (
+            <div className="text-xs opacity-60 italic px-1 py-2">
+              Aucun bandeau dans le canevas.
+            </div>
+          )}
+          {canvas.banners.map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              onClick={() => setSelectedId(b.id)}
+              className={
+                "w-full text-left text-sm px-3 py-2 rounded-xl border transition cursor-pointer " +
+                (b.id === selectedId
+                  ? "border-amber-400 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-100"
+                  : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/40")
+              }
+            >
+              <div className="font-medium truncate">{b.label}</div>
+              <div className="text-[11px] opacity-70 tabular-nums">
+                {b.width}×{b.height} @ ({b.x},{b.y})
+              </div>
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={addBanner}
+            className="w-full inline-flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+          >
+            <PlusIcon className="w-4 h-4" />
+            Ajouter un bandeau
+          </button>
+        </div>
+
+        {/* Preview area */}
+        <div className="flex flex-col items-center">
+          <div className="text-xs opacity-60 mb-2 tabular-nums">
+            Aperçu — {canvas.width}×{canvas.height} px (échelle {Math.round(scale * 100)}%)
+          </div>
+          <div
+            onClick={() => setSelectedId(null)}
+            className="relative rounded-md border border-zinc-300 dark:border-zinc-700 bg-zinc-900 cursor-pointer"
+            style={{ width: previewW, height: previewH }}
+          >
+            {canvas.banners.map((b) => {
+              const isSel = b.id === selectedId;
+              return (
+                <div
+                  key={b.id}
+                  onClick={(e) => { e.stopPropagation(); setSelectedId(b.id); }}
+                  className={
+                    "absolute flex items-center justify-center text-[10px] font-mono select-none px-1 truncate " +
+                    (isSel ? "ring-2 ring-amber-400 text-amber-50" : "ring-1 ring-white/30 text-white/80")
+                  }
+                  style={{
+                    left: Math.round(b.x * scale),
+                    top: Math.round(b.y * scale),
+                    width: Math.max(1, Math.round(b.width * scale)),
+                    height: Math.max(1, Math.round(b.height * scale)),
+                    background: isSel ? "rgba(251,191,36,0.22)" : "rgba(59,130,246,0.22)",
+                    cursor: "pointer",
+                    boxSizing: "border-box",
+                  }}
+                  title={`${b.label} — ${b.width}×${b.height} @ (${b.x},${b.y})`}
+                >
+                  <span className="truncate">{b.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Properties panel */}
+      {selected ? (
+        <div className="mt-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <input
+              type="text"
+              value={selected.label}
+              onChange={(e) => updateBanner(selected.id, { label: e.target.value })}
+              className="text-base font-semibold bg-transparent border-0 border-b border-transparent hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-zinc-500 focus:outline-none px-0 py-0.5 flex-1 min-w-0"
+              aria-label="Nom du bandeau"
+            />
+            <button
+              type="button"
+              onClick={() => removeBanner(selected.id)}
+              className="flex-shrink-0 inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-red-300 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
+            >
+              <TrashIcon className="w-3.5 h-3.5" />
+              Supprimer
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <Label htmlFor="bx">X (px)</Label>
+              <TextInput
+                id="bx"
+                type="number"
+                value={selected.x}
+                onChange={(e) => updateBanner(selected.id, {
+                  x: Math.max(0, Math.min(canvas.width - selected.width, Number(e.target.value) || 0)),
+                })}
+                inputMode="numeric"
+              />
+            </div>
+            <div>
+              <Label htmlFor="by">Y (px)</Label>
+              <TextInput
+                id="by"
+                type="number"
+                value={selected.y}
+                onChange={(e) => updateBanner(selected.id, {
+                  y: Math.max(0, Math.min(canvas.height - selected.height, Number(e.target.value) || 0)),
+                })}
+                inputMode="numeric"
+              />
+            </div>
+            <div>
+              <Label htmlFor="bw">Largeur (px)</Label>
+              <TextInput
+                id="bw"
+                type="number"
+                value={selected.width}
+                onChange={(e) => updateBanner(selected.id, {
+                  width: Math.max(64, Math.min(canvas.width - selected.x, Number(e.target.value) || 0)),
+                })}
+                inputMode="numeric"
+              />
+            </div>
+            <div>
+              <Label htmlFor="bh">Hauteur (px)</Label>
+              <TextInput
+                id="bh"
+                type="number"
+                value={selected.height}
+                onChange={(e) => updateBanner(selected.id, {
+                  height: Math.max(32, Math.min(canvas.height - selected.y, Number(e.target.value) || 0)),
+                })}
+                inputMode="numeric"
+              />
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-4 mt-4">
+            <div>
+              <Label htmlFor="bps">Entrées par page — {selected.pageSize}</Label>
+              <input
+                id="bps"
+                type="range"
+                min="1" max="6" step="1"
+                value={selected.pageSize}
+                onChange={(e) => updateBanner(selected.id, { pageSize: Number(e.target.value) })}
+                className="w-full mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="bns">Échelle nom — {Number(selected.nameScale).toFixed(2)}×</Label>
+              <input
+                id="bns"
+                type="range"
+                min="0.6" max="2" step="0.05"
+                value={selected.nameScale}
+                onChange={(e) => updateBanner(selected.id, {
+                  nameScale: Math.min(2, Math.max(0.6, Number(e.target.value))),
+                })}
+                className="w-full mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="bss">Échelle score — {Number(selected.scoreScale).toFixed(2)}×</Label>
+              <input
+                id="bss"
+                type="range"
+                min="0.6" max="2" step="0.05"
+                value={selected.scoreScale}
+                onChange={(e) => updateBanner(selected.id, {
+                  scoreScale: Math.min(2, Math.max(0.6, Number(e.target.value))),
+                })}
+                className="w-full mt-1"
+              />
+            </div>
+          </div>
+
+          <label className="mt-4 flex items-center gap-2 select-none cursor-pointer">
+            <input
+              type="checkbox"
+              checked={selected.showLogo !== false}
+              onChange={(e) => updateBanner(selected.id, { showLogo: e.target.checked })}
+              className="w-4 h-4"
+            />
+            <span className="text-sm">Afficher le logo Festival Western</span>
+          </label>
+        </div>
+      ) : (
+        <div className="mt-5 text-sm opacity-60 text-center py-6 border border-dashed border-zinc-300 dark:border-zinc-700 rounded-2xl">
+          Sélectionnez un bandeau dans la liste ou l'aperçu pour modifier ses propriétés.
+        </div>
+      )}
+
+      <div className="mt-5 flex justify-end">
+        <OutputLauncher
+          buildUrl={buildCanvasUrl}
+          windowName="rodeo-canvas"
+          windowFeatures={`noopener,noreferrer,width=${canvas.width},height=${canvas.height}`}
+          label="Ouvrir le canevas"
+          icon={Squares2X2Icon}
+          onBeforeLaunch={() => bus?.post({ type: "sync:update", payload: state })}
+          stacked
+        />
+      </div>
     </Card>
   );
 }
@@ -346,6 +656,7 @@ function TableTab({ state, push }) {
 const TABS = [
   { id: "qr",     label: "QR codes", icon: QrCodeIcon },
   { id: "banner", label: "Bandeau",  icon: TvIcon },
+  { id: "canvas", label: "Canevas",  icon: Squares2X2Icon },
   { id: "table",  label: "Tableau",  icon: ComputerDesktopIcon },
 ];
 
@@ -363,6 +674,7 @@ export default function SettingsView() {
     url.searchParams.delete("settings");
     url.searchParams.delete("display");
     url.searchParams.delete("banner");
+    url.searchParams.delete("canvas");
     window.location.href = url.toString();
   }
 
@@ -398,6 +710,7 @@ export default function SettingsView() {
 
         {active === "qr"     && <QrTab />}
         {active === "banner" && <BannerTab state={state} push={push} />}
+        {active === "canvas" && <CanvasTab state={state} push={push} />}
         {active === "table"  && <TableTab state={state} push={push} />}
       </div>
     </div>

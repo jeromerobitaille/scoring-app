@@ -29,12 +29,19 @@ export const DEFAULT_BANNERS = [
   },
 ];
 
+export const DEFAULT_CANVAS = {
+  width: 1920,
+  height: 1080,
+  banners: [], // user adds sub-banners via the editor; default empty
+};
+
 const DEFAULT_STATE = {
   eventName: "Rodeo",
   scoreMode: "higher",
   entries: [],
   theme: "dark",
   banners: DEFAULT_BANNERS,
+  canvas: DEFAULT_CANVAS,
   // Tableau plein écran
   displayPageSize: 5,           // entries per page (1–10)
   displayRotationMs: 5000,      // ms between auto-rotations; 0 disables rotation
@@ -53,6 +60,33 @@ function normalizeBanner(src, fallback) {
     pageSize: Math.min(6, Math.max(1, Number(src?.pageSize ?? fallback.pageSize))),
     showLogo: src?.showLogo ?? fallback.showLogo,
   };
+}
+
+function normalizeCanvasBanner(src, canvasW, canvasH) {
+  const w = Math.max(64, Math.min(canvasW, Number(src?.width) || 1920));
+  const h = Math.max(32, Math.min(canvasH, Number(src?.height) || 216));
+  return {
+    id: src?.id ?? `c-${Math.random().toString(36).slice(2, 8)}`,
+    label: src?.label ?? "Bandeau",
+    x: Math.max(0, Math.min(canvasW - w, Number(src?.x) || 0)),
+    y: Math.max(0, Math.min(canvasH - h, Number(src?.y) || 0)),
+    width: w,
+    height: h,
+    nameScale: Math.min(2, Math.max(0.6, Number(src?.nameScale ?? 1))),
+    scoreScale: Math.min(2, Math.max(0.6, Number(src?.scoreScale ?? 1))),
+    pageSize: Math.min(6, Math.max(1, Number(src?.pageSize ?? 3))),
+    showLogo: src?.showLogo ?? true,
+  };
+}
+
+function migrateCanvas(saved) {
+  const src = saved.canvas ?? DEFAULT_CANVAS;
+  const width = Math.max(320, Number(src.width) || DEFAULT_CANVAS.width);
+  const height = Math.max(64, Number(src.height) || DEFAULT_CANVAS.height);
+  const banners = Array.isArray(src.banners)
+    ? src.banners.map((b) => normalizeCanvasBanner(b, width, height))
+    : [];
+  return { width, height, banners };
 }
 
 function migrateBanners(saved) {
@@ -81,6 +115,7 @@ export default function useSyncedState() {
       ...DEFAULT_STATE,
       ...saved,
       banners: migrateBanners(saved),
+      canvas: migrateCanvas(saved),
       displayPageSize: Math.min(10, Math.max(1, Number(saved.displayPageSize ?? DEFAULT_STATE.displayPageSize))),
       displayRotationMs: Math.max(0, Number(saved.displayRotationMs ?? DEFAULT_STATE.displayRotationMs)),
       displayShowPagination: saved.displayShowPagination ?? DEFAULT_STATE.displayShowPagination,
