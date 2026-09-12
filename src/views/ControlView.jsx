@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import useSyncedState from "../state/useSyncedState";
 import { detectIsTimeString, parseScore } from "../utils/score";
 import Button from "../components/ui/Button";
@@ -7,6 +7,7 @@ import Label from "../components/ui/Label";
 import TextInput from "../components/ui/TextInput";
 import EntriesTable from "../components/EntriesTable";
 import ThemeToggle from "../components/ui/ThemeToggle";
+import ConfirmDialog from "../components/ui/ConfirmDialog";
 import {
   Cog6ToothIcon,
   EllipsisVerticalIcon,
@@ -34,6 +35,20 @@ function toTitleCase(str) {
   return str.replace(/\p{L}[\p{L}\p{M}'-]*/gu, (w) =>
     w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
   );
+}
+
+/**
+ * Put the caret back in a field and make the browser actually re-run its focus
+ * path. A bare .focus() is a no-op when document.activeElement already *is* the
+ * element, which is exactly the state the window ends up in after a native
+ * dialog or a native <select> popup has taken the OS key focus away. Blurring
+ * first forces the focus to be re-established for real.
+ */
+function refocus(ref) {
+  const el = ref?.current;
+  if (!el) return;
+  if (document.activeElement === el) el.blur();
+  el.focus({ preventScroll: true });
 }
 
 function NetStatusDot({ status }) {
@@ -70,9 +85,13 @@ function KebabMenu({ onClearAll }) {
     const handle = (e) => {
       if (ref.current && !ref.current.contains(e.target)) setOpen(false);
     };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
     document.addEventListener("mousedown", handle);
-    document.addEventListener("keydown", (e) => e.key === "Escape" && setOpen(false));
-    return () => document.removeEventListener("mousedown", handle);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", handle);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
   return (
@@ -106,6 +125,7 @@ export default function ControlView() {
   const [name, setName] = useState("");
   const [score, setScore] = useState("");
   const [editingId, setEditingId] = useState(null);
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const nameRef = useRef(null);
   const scoreRef = useRef(null);
 
@@ -126,13 +146,13 @@ export default function ControlView() {
   }, [state.theme]);
 
   // Autofocus name on mount
-  useEffect(() => { nameRef.current?.focus(); }, []);
+  useEffect(() => { refocus(nameRef); }, []);
 
   function resetForm() {
     setName("");
     setScore("");
     setEditingId(null);
-    nameRef.current?.focus();
+    refocus(nameRef);
   }
 
   function submitEntry() {
@@ -170,7 +190,7 @@ export default function ControlView() {
     if (e.key === "Enter") {
       e.preventDefault();
       if (canSubmit) submitEntry();
-      else scoreRef.current?.focus();
+      else refocus(scoreRef);
     }
   }
   function handleScoreKey(e) {
@@ -184,9 +204,11 @@ export default function ControlView() {
   }
 
   function clearAll() {
-    if (!confirm("Effacer toutes les entrées de cette discipline ?")) return;
+    setConfirmClearOpen(false);
     push({ ...state, entries: [] });
-    resetForm();
+    // The dialog unmounts in this same commit; wait for the next frame so the
+    // input exists and is focusable before we reach for it.
+    requestAnimationFrame(resetForm);
   }
 
   function remove(id) {
@@ -200,7 +222,7 @@ export default function ControlView() {
     setEditingId(id);
     setName(entry.name === "(sans nom)" ? "" : entry.name);
     setScore(entry.raw ?? "");
-    setTimeout(() => scoreRef.current?.focus(), 0);
+    requestAnimationFrame(() => refocus(scoreRef));
   }
 
   function openSettings() {
@@ -238,7 +260,7 @@ export default function ControlView() {
             >
               <Cog6ToothIcon className="w-5 h-5" />
             </button>
-            <KebabMenu onClearAll={clearAll} />
+            <KebabMenu onClearAll={() => setConfirmClearOpen(true)} />
           </div>
         </header>
 
@@ -249,9 +271,21 @@ export default function ControlView() {
             <select
               className="flex-1 min-w-0 rounded-xl border px-3 py-2 bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700"
               value={state.eventName || ""}
-              onChange={(e) => push({ ...state, eventName: e.target.value })}
+              onChange={(e) => {
+                push({ ...state, eventName: e.target.value });
+                // A native <select> popup holds the OS key focus while it is
+                // open; hand it back to the name field so the operator can type
+                // straight away instead of into a dead window.
+                requestAnimationFrame(() => refocus(nameRef));
+              }}
             >
               <option value="" disabled>— Choisir une discipline —</option>
+              {/* Keep a saved discipline that is no longer in the list selectable,
+                  otherwise the <select> would silently display a different one
+                  than the one actually stored in the state. */}
+              {state.eventName && !DISCIPLINES.includes(state.eventName) && (
+                <option value={state.eventName}>{state.eventName}</option>
+              )}
               {DISCIPLINES.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
           </div>
@@ -260,7 +294,10 @@ export default function ControlView() {
             <select
               className="rounded-xl border px-3 py-2 bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700"
               value={state.scoreMode}
-              onChange={(e) => push({ ...state, scoreMode: e.target.value })}
+              onChange={(e) => {
+                push({ ...state, scoreMode: e.target.value });
+                requestAnimationFrame(() => refocus(nameRef));
+              }}
             >
               <option value="higher">Score (plus haut = meilleur)</option>
               <option value="lower">Temps (plus bas = meilleur)</option>
@@ -378,6 +415,19 @@ export default function ControlView() {
           </div>
         </div>
       </footer>
+
+      <ConfirmDialog
+        open={confirmClearOpen}
+        title="Effacer toutes les entrées ?"
+        message={`Les ${state.entries.length} entrée${state.entries.length > 1 ? "s" : ""} de cette discipline seront supprimées. Cette action est irréversible.`}
+        confirmLabel="Effacer tout"
+        cancelLabel="Annuler"
+        onConfirm={clearAll}
+        onCancel={() => {
+          setConfirmClearOpen(false);
+          requestAnimationFrame(() => refocus(nameRef));
+        }}
+      />
     </div>
   );
 }

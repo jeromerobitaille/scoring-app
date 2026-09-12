@@ -64,6 +64,18 @@ function createWindow() {
     return { action: "deny" };
   });
 
+  // Safety net: on macOS a native modal (or a native <select> popup) can leave
+  // the window looking focused while the web contents no longer holds the OS
+  // key focus — keystrokes then go nowhere and the app looks frozen for input.
+  // Re-asserting focus on the web contents whenever the window is activated
+  // makes that state recoverable without restarting the app.
+  mainWindow.on("focus", () => {
+    try { mainWindow.webContents.focus(); } catch {}
+  });
+  mainWindow.on("show", () => {
+    try { mainWindow.webContents.focus(); } catch {}
+  });
+
   mainWindow.on("closed", () => { mainWindow = null; });
 }
 
@@ -227,6 +239,7 @@ function setupAutoUpdate() {
       defaultId: 0,
       cancelId: 1,
     });
+    try { mainWindow.webContents.focus(); } catch {}
     if (response === 0) {
       autoUpdater.downloadUpdate().catch((err) => {
         console.error("[fwst-scoring] downloadUpdate failed:", err);
@@ -245,6 +258,7 @@ function setupAutoUpdate() {
       defaultId: 0,
       cancelId: 1,
     });
+    try { mainWindow.webContents.focus(); } catch {}
     if (response === 0) autoUpdater.quitAndInstall();
   });
 
