@@ -4,6 +4,7 @@ import useSyncedState from "../state/useSyncedState";
 import useFullscreenExit from "../hooks/useFullscreenExit";
 import { computeRanking, formatScore, entryDisplayMode } from "../utils/score";
 import logo from "../assets/logo.png";
+import { useOutputTimer } from "../hooks/useLiveTimer";
 
 
 const rankBadgeBg = (rank) => {
@@ -16,6 +17,9 @@ const rankBadgeBg = (rank) => {
 export default function DisplayView() {
   useFullscreenExit();
   const [state] = useSyncedState();
+  const timerFrame = useOutputTimer({
+    enabled: state.scoreMode === "lower" && state.timerArmed && state.showLiveTimer !== false,
+  });
 
   useEffect(() => {
     document.body.classList.toggle("dark", state.theme === "dark");
@@ -70,6 +74,38 @@ export default function DisplayView() {
           {state.eventName}
         </h1>
       </div>
+
+      <AnimatePresence>
+        {timerFrame && (
+          <motion.div
+            key="live-timer"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3 }}
+            className="mx-auto w-full max-w-7xl overflow-hidden"
+          >
+            <div className="flex items-center justify-center gap-8 rounded-3xl border-2 border-zinc-200 dark:border-zinc-700 bg-white/70 dark:bg-zinc-900 px-8 py-4">
+              {state.currentCompetitor && (
+                <span className="text-3xl md:text-5xl font-bold truncate min-w-0">
+                  {state.currentCompetitor}
+                </span>
+              )}
+              <span
+                className={`text-2xl md:text-4xl font-extrabold uppercase tracking-widest ${
+                  timerFrame.state === "running" ? "text-amber-500" : "text-emerald-500"
+                }`}
+              >
+                {timerFrame.state === "running" ? "Chrono" : "Temps"}
+              </span>
+              <span className="text-7xl md:text-9xl font-black tabular-nums leading-none">
+                {formatScore(timerFrame.seconds, "time")}
+              </span>
+              <span className="text-2xl md:text-4xl opacity-70">sec</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="relative">
         <AnimatePresence mode="wait">

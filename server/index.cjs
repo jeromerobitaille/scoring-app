@@ -74,7 +74,7 @@ function createServer({ staticDir, port = 5050, hubPath = "/live-score" }) {
     });
   });
 
-  attachHub(server, hubPath);
+  const hub = attachHub(server, hubPath);
 
   return new Promise((resolve, reject) => {
     const tryListen = (p) => {
@@ -88,7 +88,12 @@ function createServer({ staticDir, port = 5050, hubPath = "/live-score" }) {
       server.listen(p, "0.0.0.0", () => {
         const addr = server.address();
         const actualPort = typeof addr === "object" && addr ? addr.port : p;
-        resolve({ server, port: actualPort, addresses: getLanAddresses() });
+        resolve({
+          server,
+          port: actualPort,
+          addresses: getLanAddresses(),
+          publishTimer: hub.publishTimer,
+        });
       });
     };
     tryListen(port);

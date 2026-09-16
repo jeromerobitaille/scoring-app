@@ -15,6 +15,60 @@ const rankBadgeBg = (rank) => {
 };
 
 /**
+ * Chrono FarmTek en direct, par-dessus le bandeau : le temps seul, précédé du
+ * nom du compétiteur si l'option est active. Sous l'annonce « breaking »
+ * (zIndex 50) pour qu'un résultat qu'on vient de saisir reste prioritaire.
+ */
+function LiveTimerOverlay({ frame, competitor, unit, containerH }) {
+  return (
+    <motion.div
+      key="live-timer"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.25 }}
+      style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: 40,
+        background: "linear-gradient(180deg,#000,#0b0b0b)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: Math.round(40 * unit),
+        color: "#fff",
+      }}
+    >
+      {competitor && (
+        <div
+          style={{
+            fontSize: Math.round(containerH * 0.3),
+            fontWeight: 800,
+            maxWidth: "50%",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {competitor}
+        </div>
+      )}
+      <div
+        style={{
+          fontSize: Math.round(containerH * 0.72),
+          lineHeight: 1,
+          fontWeight: 900,
+          fontVariantNumeric: "tabular-nums lining-nums",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {formatScore(frame.seconds, "time")}
+      </div>
+    </motion.div>
+  );
+}
+
+/**
  * Pure presentational banner. Renders the chip layout (logo + ranked entries)
  * and the breaking-news overlay inside the bounds given by `width` × `height`.
  * No URL/localStorage access — all data comes from props.
@@ -26,6 +80,8 @@ export default function BannerView({
   eventName,
   width,
   height,
+  timerFrame = null,
+  competitor = null,
 }) {
   const containerW = Math.max(64, Number(width) || 0);
   const containerH = Math.max(32, Number(height) || 0);
@@ -147,6 +203,9 @@ export default function BannerView({
             {eventName?.trim() || "En attente des résultats…"}
           </div>
         )}
+        <AnimatePresence>
+          {timerFrame && <LiveTimerOverlay frame={timerFrame} competitor={competitor} unit={unit} containerH={containerH} />}
+        </AnimatePresence>
       </div>
     );
   }
@@ -293,6 +352,10 @@ export default function BannerView({
           </motion.div>
         </AnimatePresence>
       </div>
+
+      <AnimatePresence>
+        {timerFrame && <LiveTimerOverlay frame={timerFrame} competitor={competitor} unit={unit} containerH={containerH} />}
+      </AnimatePresence>
 
       {/* Breaking news overlay */}
       <AnimatePresence>

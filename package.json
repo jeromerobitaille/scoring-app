@@ -38,6 +38,7 @@
     "qrcode.react": "^4.2.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "serialport": "^13.0.0",
     "tailwindcss": "^4.1.13",
     "ws": "^8.18.3"
   },
@@ -79,6 +80,7 @@
       }
     ],
     "asar": true,
+    "npmRebuild": false,
     "mac": {
       "category": "public.app-category.sports",
       "target": [

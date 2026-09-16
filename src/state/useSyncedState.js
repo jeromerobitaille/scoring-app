@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import LocalSocket from "../sync/LocalSocket";
 import { bus } from "../sync/SyncBus";
+import { normalizeState } from "./model";
 
 const LS_KEY = "rodeo-scoring-state-v1";
 function loadState() { try { return JSON.parse(localStorage.getItem(LS_KEY)) || null; } catch { return null; } }
@@ -47,6 +48,8 @@ const DEFAULT_STATE = {
   displayRotationMs: 5000,      // ms between auto-rotations; 0 disables rotation
   displayShowPagination: true,  // show the dot indicators
   showDisplayLogo: true,        // hide the FWST logo on the fullscreen leaderboard
+  showLiveTimer: true,          // live FarmTek time on the outputs (time mode only)
+  bannerTimerShowName: false,   // competitor name next to the live time on LED banners
 };
 
 function normalizeBanner(src, fallback) {
@@ -111,7 +114,7 @@ function migrateBanners(saved) {
 export default function useSyncedState() {
   const [state, setState] = useState(() => {
     const saved = loadState() ?? {};
-    return {
+    return normalizeState({
       ...DEFAULT_STATE,
       ...saved,
       banners: migrateBanners(saved),
@@ -120,7 +123,9 @@ export default function useSyncedState() {
       displayRotationMs: Math.max(0, Number(saved.displayRotationMs ?? DEFAULT_STATE.displayRotationMs)),
       displayShowPagination: saved.displayShowPagination ?? DEFAULT_STATE.displayShowPagination,
       showDisplayLogo: saved.showDisplayLogo ?? DEFAULT_STATE.showDisplayLogo,
-    };
+      showLiveTimer: saved.showLiveTimer ?? DEFAULT_STATE.showLiveTimer,
+      bannerTimerShowName: saved.bannerTimerShowName ?? DEFAULT_STATE.bannerTimerShowName,
+    });
   });
   const params = useMemo(() => {
     if (typeof window === "undefined") return { useNet: false, roomId: "default" };
@@ -147,7 +152,8 @@ export default function useSyncedState() {
       sockRef.current = sock;
       const offStatus = sock.onStatus(setNetStatus);
       sock.connect();
-      const off = sock.on((remote) => {
+      const off = sock.on((incoming) => {
+        const remote = normalizeState(incoming);
         setState((prev) => {
           if (JSON.stringify(prev) === JSON.stringify(remote)) return prev;
           saveState(remote);
@@ -161,13 +167,15 @@ export default function useSyncedState() {
     if (!bus) return;
     const off = bus.on((data) => {
       if (data?.type === "sync:update" && data.payload) {
-        setState((prev) => (JSON.stringify(prev) === JSON.stringify(data.payload) ? prev : data.payload));
+        const remote = normalizeState(data.payload);
+        setState((prev) => (JSON.stringify(prev) === JSON.stringify(remote) ? prev : remote));
       }
     });
     return off;
   }, [params.useNet, params.roomId, wsURL]);
 
-  const push = (next) => {
+  const push = (input) => {
+    const next = normalizeState(input);
     setState(next);
     saveState(next);
     if (params.useNet) {

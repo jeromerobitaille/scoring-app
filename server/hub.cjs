@@ -4,6 +4,10 @@ function attachHub(httpServer, path = "/live-score") {
   const wss = new WebSocketServer({ noServer: true });
   const rooms = new Map();
   const roomState = new Map();
+  // Clients abonnés au chrono. Le temps défile à ~23 trames/s : il circule sur
+  // ce canal à part au lieu de passer par l'état synchronisé (localStorage).
+  const timerSubs = new Set();
+  let lastTimer = { frame: null, status: null };
 
   function joinRoom(ws, room) {
     if (!rooms.has(room)) rooms.set(room, new Set());
@@ -53,6 +57,12 @@ function attachHub(httpServer, path = "/live-score") {
         joinRoom(ws, msg.room);
         return;
       }
+      if (msg.type === "timer:subscribe") {
+        timerSubs.add(ws);
+        if (lastTimer.status) ws.send(JSON.stringify({ type: "timer:status", ...lastTimer.status }));
+        if (lastTimer.frame) ws.send(JSON.stringify({ type: "timer:frame", ...lastTimer.frame }));
+        return;
+      }
       if (msg.type === "state:push" && msg.room && msg.state) {
         roomState.set(msg.room, msg.state);
         broadcast(msg.room, { type: "state:full", room: msg.room, state: msg.state }, ws);
@@ -60,8 +70,8 @@ function attachHub(httpServer, path = "/live-score") {
       }
     });
 
-    ws.on("close", () => leaveRoom(ws));
-    ws.on("error", () => leaveRoom(ws));
+    ws.on("close", () => { leaveRoom(ws); timerSubs.delete(ws); });
+    ws.on("error", () => { leaveRoom(ws); timerSubs.delete(ws); });
   });
 
   const interval = setInterval(() => {
@@ -74,7 +84,16 @@ function attachHub(httpServer, path = "/live-score") {
 
   httpServer.on("close", () => clearInterval(interval));
 
-  return wss;
+  function publishTimer(kind, payload) {
+    if (kind === "frame") lastTimer.frame = payload;
+    if (kind === "status") lastTimer.status = payload;
+    const str = JSON.stringify({ type: `timer:${kind}`, ...payload });
+    for (const client of timerSubs) {
+      if (client.readyState === 1) client.send(str);
+    }
+  }
+
+  return { wss, publishTimer };
 }
 
 module.exports = { attachHub };

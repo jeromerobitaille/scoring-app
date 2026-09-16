@@ -1,13 +1,16 @@
 const { app, BrowserWindow, Menu, shell, dialog, ipcMain, screen } = require("electron");
 const path = require("node:path");
+const fs = require("node:fs");
 const { autoUpdater } = require("electron-updater");
 const { createServer } = require("../server/index.cjs");
+const { TimerReader, listPorts } = require("../server/timer.cjs");
 
 const isDev = !app.isPackaged;
 const DEFAULT_PORT = Number(process.env.FWST_PORT) || 5050;
 
 let mainWindow = null;
 let serverInfo = null;
+const timer = new TimerReader();
 
 function resolveStaticDir() {
   // In dev: <repo>/dist  (after `vite build`) — main.cjs lives at <repo>/electron
@@ -31,6 +34,39 @@ async function startServer() {
     );
     app.exit(1);
   }
+}
+
+// ── Chrono FarmTek (USB-série) ────────────────────────────────
+const TIMER_DEFAULTS = { enabled: true, port: "auto", baudRate: 9600 };
+
+function timerConfigPath() {
+  return path.join(app.getPath("userData"), "timer.json");
+}
+
+function loadTimerConfig() {
+  try {
+    const saved = JSON.parse(fs.readFileSync(timerConfigPath(), "utf8"));
+    return sanitizeTimerConfig(saved);
+  } catch {
+    return { ...TIMER_DEFAULTS };
+  }
+}
+
+function sanitizeTimerConfig(src) {
+  const baudRate = Number(src?.baudRate);
+  return {
+    enabled: src?.enabled ?? TIMER_DEFAULTS.enabled,
+    port: typeof src?.port === "string" && src.port ? src.port : TIMER_DEFAULTS.port,
+    baudRate: Number.isInteger(baudRate) && baudRate > 0 ? baudRate : TIMER_DEFAULTS.baudRate,
+  };
+}
+
+function startTimer() {
+  timer.on("frame", (frame) => serverInfo?.publishTimer("frame", frame));
+  timer.on("status", (status) => {
+    serverInfo?.publishTimer("status", { ...status, config: timer.config });
+  });
+  timer.start(loadTimerConfig());
 }
 
 function createWindow() {
@@ -216,6 +252,19 @@ function setupIpc() {
     return { ok: true, displayId: target.id };
   });
 
+  ipcMain.handle("timer:listPorts", () => listPorts());
+  ipcMain.handle("timer:getConfig", () => ({ config: timer.config, status: timer.status }));
+  ipcMain.handle("timer:setConfig", (_event, next) => {
+    const config = sanitizeTimerConfig({ ...timer.config, ...next });
+    try {
+      fs.writeFileSync(timerConfigPath(), JSON.stringify(config, null, 2));
+    } catch (err) {
+      console.error("[timer] config non enregistrée :", err.message);
+    }
+    timer.start(config);
+    return { config: timer.config, status: timer.status };
+  });
+
   ipcMain.handle("window:closeSelf", (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win && win !== mainWindow) win.close();
@@ -273,6 +322,7 @@ function setupAutoUpdate() {
 
 app.whenReady().then(async () => {
   await startServer();
+  startTimer();
   setupIpc();
   buildMenu();
   createWindow();
@@ -282,6 +332,8 @@ app.whenReady().then(async () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
+
+app.on("before-quit", () => timer.stop());
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();

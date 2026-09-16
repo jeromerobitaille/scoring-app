@@ -40,7 +40,7 @@ export default function EntriesTable({ entries, scoreMode, onRemove, onEdit, edi
             <th className="py-2 pr-3 w-14">Rang</th>
             <th className="py-2 pr-3">Compétiteur</th>
             <th className="py-2 pr-3 w-32">Score/Temps</th>
-            <th className="py-2 pr-3 w-24 text-zinc-400">Brut</th>
+            <th className="py-2 pr-3 w-28 text-zinc-400">Brut</th>
             <th className="py-2 pr-2 w-28 text-right">Actions</th>
           </tr>
         </thead>
@@ -68,7 +68,16 @@ export default function EntriesTable({ entries, scoreMode, onRemove, onEdit, edi
                   <td className="py-2 pr-3 tabular-nums font-semibold">
                     {formatScore(e.parsed, entryDisplayMode(e, scoreMode))}
                   </td>
-                  <td className="py-2 pr-3 text-zinc-500 truncate">{e.raw || ""}</td>
+                  <td className="py-2 pr-3 text-zinc-500 truncate tabular-nums">
+                    {e.time != null ? (
+                      <>
+                        {formatScore(e.time, "time")}
+                        {e.penalty > 0 && (
+                          <span className="ml-1 font-semibold text-red-600 dark:text-red-400">+{e.penalty}</span>
+                        )}
+                      </>
+                    ) : (e.raw || "")}
+                  </td>
                   <td className="py-2 pr-2 text-right">
                     <div className="inline-flex items-center gap-1">
                       {onEdit && (
@@ -100,7 +109,7 @@ export default function EntriesTable({ entries, scoreMode, onRemove, onEdit, edi
           {ranked.length === 0 && (
             <tr>
               <td colSpan={5} className="py-8 text-center opacity-60">
-                Aucune entrée pour le moment. Tapez le nom du compétiteur ci-dessus et son score, puis pressez Entrée.
+                Aucun résultat pour le moment. Sélectionnez un compétiteur dans l'ordre de passage, puis saisissez son résultat ou armez le chrono.
               </td>
             </tr>
           )}
