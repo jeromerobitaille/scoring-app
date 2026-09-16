@@ -6,6 +6,9 @@
  *                         armedByDefault }]
  *   rodeos             [{ id, name, competitions: { [disciplineId]: Competition } }]
  *   currentRodeoId, currentDisciplineId
+ *   pendingRun         { seconds, eye, session, runId } | null — arrivée en
+ *                      attente de validation sur le poste du chrono. Les sorties
+ *                      gardent ce temps affiché jusqu'à validation / annulation.
  *   timerArmed         chrono armé (partagé : les sorties n'affichent le chrono
  *                      que s'il est armé). Reprend armedByDefault à chaque
  *                      changement de discipline (timerArmedFor mémorise laquelle).
@@ -133,6 +136,10 @@ export function normalizeState(input) {
     ? state.timerArmed === true
     : discipline.armedByDefault;
   timerArmed = timerArmed && discipline.scoreMode === "lower";
+  const sameDiscipline = state.timerArmedFor === discipline.id;
+  const pendingRun = sameDiscipline && discipline.scoreMode === "lower" && state.pendingRun
+    ? state.pendingRun
+    : null;
 
   return {
     ...state,
@@ -142,6 +149,7 @@ export function normalizeState(input) {
     currentDisciplineId: discipline.id,
     timerArmed,
     timerArmedFor: discipline.id,
+    pendingRun,
     eventName: discipline.name,
     scoreMode: discipline.scoreMode,
     entries: comp.entries,

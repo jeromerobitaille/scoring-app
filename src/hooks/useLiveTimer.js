@@ -66,14 +66,18 @@ export const TIMER_STATE_LABEL = {
   unknown: "En attente",
 };
 
-const HOLD_AFTER_STOP_MS = 6000;
+// Juste après l'arrêt, le temps reste affiché le temps que la course en
+// attente (pendingRun) arrive du poste du chrono — évite un clignotement.
+const HOLD_AFTER_STOP_MS = 2000;
 
 /**
- * Chrono à afficher sur une sortie (tableau, bandeau), ou null.
- * Visible pendant la course puis quelques secondes après l'arrivée ; jamais
- * pour un temps arrêté dont on n'a pas vu la course (ex. au branchement).
+ * Chrono à afficher sur une sortie (tableau, bandeau, canevas), ou null.
+ * - pendant la course : le temps qui défile ;
+ * - après l'arrivée : le temps arrêté, tant que la course n'a pas été validée
+ *   ou annulée sur le poste du chrono (`pendingRun`, état partagé) ;
+ * - jamais pour un temps arrêté dont on n'a pas vu la course (ex. au branchement).
  */
-export function useOutputTimer({ enabled }) {
+export function useOutputTimer({ enabled, pendingRun = null }) {
   const { frame } = useLiveTimer({ enabled });
   const seenRunRef = useRef(null); // `${session}:${runId}` de la dernière course vue en marche
   const [held, setHeld] = useState(null); // clé de la course dont on affiche l'arrivée
@@ -96,8 +100,9 @@ export function useOutputTimer({ enabled }) {
     if (state === "ready") setHeld(null);
   }, [key, state]);
 
-  if (!enabled || !frame) return null;
-  if (state === "running") return frame;
-  if (state === "stopped" && held === key) return frame;
+  if (!enabled) return null;
+  if (frame && state === "running") return frame;
+  if (pendingRun) return { ...pendingRun, state: "stopped" };
+  if (frame && state === "stopped" && held === key) return frame;
   return null;
 }

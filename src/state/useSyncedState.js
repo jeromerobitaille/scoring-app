@@ -65,16 +65,32 @@ function normalizeBanner(src, fallback) {
   };
 }
 
+const TIMER_ALIGNS = ["left", "center", "right"];
+
 function normalizeCanvasBanner(src, canvasW, canvasH) {
   const w = Math.max(64, Math.min(canvasW, Number(src?.width) || 1920));
   const h = Math.max(32, Math.min(canvasH, Number(src?.height) || 216));
-  return {
+  const base = {
     id: src?.id ?? `c-${Math.random().toString(36).slice(2, 8)}`,
-    label: src?.label ?? "Bandeau",
     x: Math.max(0, Math.min(canvasW - w, Number(src?.x) || 0)),
     y: Math.max(0, Math.min(canvasH - h, Number(src?.y) || 0)),
     width: w,
     height: h,
+  };
+  if (src?.kind === "timer") {
+    return {
+      ...base,
+      kind: "timer",
+      label: src?.label ?? "Chrono",
+      showName: Boolean(src?.showName),
+      align: TIMER_ALIGNS.includes(src?.align) ? src.align : "center",
+      timeScale: Math.min(1.5, Math.max(0.5, Number(src?.timeScale ?? 1))),
+    };
+  }
+  return {
+    ...base,
+    kind: "banner",
+    label: src?.label ?? "Bandeau",
     nameScale: Math.min(2, Math.max(0.6, Number(src?.nameScale ?? 1))),
     scoreScale: Math.min(2, Math.max(0.6, Number(src?.scoreScale ?? 1))),
     pageSize: Math.min(6, Math.max(1, Number(src?.pageSize ?? 3))),

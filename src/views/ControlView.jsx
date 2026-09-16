@@ -253,7 +253,6 @@ export default function ControlView() {
   const [score, setScore] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
-  const [pendingRun, setPendingRun] = useState(null); // { seconds, eye }
   const nameRef = useRef(null);
   const scoreRef = useRef(null);
 
@@ -265,6 +264,9 @@ export default function ControlView() {
   // chrono : sinon chaque tablette enregistrerait le même temps en double.
   const armed = state.timerArmed;
   const isTimerHost = typeof window !== "undefined" && !!window.fwst?.timer;
+  // Arrivée en attente de validation. Partagée : les sorties gardent le temps
+  // affiché tant qu'elle n'est ni validée ni annulée.
+  const pendingRun = state.pendingRun;
 
   const scoreTrimmed = score.trim();
   const scoreParsed = scoreTrimmed === "" ? null : parseScore(scoreTrimmed);
@@ -314,7 +316,7 @@ export default function ControlView() {
    * résultat précédent du même compétiteur, ajoute à la liste un nom qui n'y
    * figure pas encore et passe au compétiteur suivant.
    */
-  function recordResult({ name: entryName, competitorId, raw, parsed, timeHint, time, penalty }) {
+  function recordResult({ name: entryName, competitorId, raw, parsed, timeHint, time, penalty }, extra) {
     let id = competitorId;
     let nextName = "";
     const next = updateActiveCompetition(state, (comp) => {
@@ -343,7 +345,7 @@ export default function ControlView() {
       nextName = roster.find((p) => p.id === currentId)?.name ?? "";
       return { ...updated, currentId };
     });
-    push(next);
+    push({ ...next, ...extra });
     // Le champ suit le compétiteur suivant, y compris quand il n'y en a plus
     // (l'effet de synchro ne se redéclenche pas si l'id reste null).
     setName(nextName);
@@ -405,7 +407,15 @@ export default function ControlView() {
 
   function handleTimerStop(frame) {
     if (!isTimerHost || !armed || pendingRun) return;
-    setPendingRun({ seconds: frame.seconds, eye: frame.eye });
+    push({
+      ...state,
+      pendingRun: {
+        seconds: frame.seconds,
+        eye: frame.eye,
+        session: frame.session,
+        runId: frame.runId,
+      },
+    });
   }
 
   function confirmRun({ competitorId, name: runName, time, penalty, total }) {
@@ -417,13 +427,12 @@ export default function ControlView() {
       timeHint: false,
       time,
       penalty,
-    });
-    setPendingRun(null);
+    }, { pendingRun: null });
     requestAnimationFrame(() => refocus(nameRef));
   }
 
   function cancelRun() {
-    setPendingRun(null);
+    push({ ...state, pendingRun: null });
     requestAnimationFrame(() => refocus(nameRef));
   }
 
@@ -485,8 +494,7 @@ export default function ControlView() {
   }
 
   function onSelectChange(patch) {
-    push({ ...state, ...patch });
-    setPendingRun(null);
+    push({ ...state, ...patch, pendingRun: null });
     // A native <select> popup holds the OS key focus while it is open; hand it
     // back to the name field so the operator can type straight away.
     requestAnimationFrame(() => refocus(nameRef));
@@ -582,6 +590,7 @@ export default function ControlView() {
                 armed={armed}
                 onArmedChange={(v) => push({ ...state, timerArmed: v })}
                 isTimerHost={isTimerHost}
+                pendingSeconds={pendingRun?.seconds ?? null}
                 competitorName={current?.name}
               />
             )}
@@ -709,8 +718,9 @@ export default function ControlView() {
         </div>
       </footer>
 
-      {pendingRun && (
+      {isTimerHost && pendingRun && (
         <RunResultDialog
+          key={`${pendingRun.session}:${pendingRun.runId}`}
           seconds={pendingRun.seconds}
           eye={pendingRun.eye}
           penalties={discipline.penalties}

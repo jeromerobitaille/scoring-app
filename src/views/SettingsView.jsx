@@ -385,6 +385,25 @@ function CanvasTab({ state, push }) {
     updateCanvas({ banners: [...canvas.banners, newBanner] });
     setSelectedId(id);
   };
+  const addTimer = () => {
+    const id = `c-${Math.random().toString(36).slice(2, 8)}`;
+    const width = Math.min(640, canvas.width);
+    const height = Math.min(160, canvas.height);
+    const timer = {
+      id,
+      kind: "timer",
+      label: "Chrono",
+      x: Math.max(0, canvas.width - width),
+      y: 0,
+      width,
+      height,
+      showName: false,
+      align: "center",
+      timeScale: 1,
+    };
+    updateCanvas({ banners: [...canvas.banners, timer] });
+    setSelectedId(id);
+  };
   const removeBanner = (id) => {
     const next = canvas.banners.filter((b) => b.id !== id);
     updateCanvas({ banners: next });
@@ -413,6 +432,8 @@ function CanvasTab({ state, push }) {
         <p className="text-sm opacity-70 mb-3">
           Une seule fenêtre qui contient plusieurs bandeaux positionnés librement —
           pratique pour envoyer une image composée à un processeur LED multi-zones.
+          Un élément « Chrono » peut y être ajouté, par exemple pour que l'équipe
+          broadcast capte le temps et l'intègre au live stream.
         </p>
         <div className="flex items-end gap-3">
           <div>
@@ -444,11 +465,11 @@ function CanvasTab({ state, push }) {
         {/* Sidebar */}
         <div className="space-y-2">
           <div className="text-xs uppercase tracking-wide opacity-60 mb-1">
-            Bandeaux ({canvas.banners.length})
+            Éléments ({canvas.banners.length})
           </div>
           {canvas.banners.length === 0 && (
             <div className="text-xs opacity-60 italic px-1 py-2">
-              Aucun bandeau dans le canevas.
+              Aucun élément dans le canevas.
             </div>
           )}
           {canvas.banners.map((b) => (
@@ -463,7 +484,12 @@ function CanvasTab({ state, push }) {
                   : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/40")
               }
             >
-              <div className="font-medium truncate">{b.label}</div>
+              <div className="font-medium truncate flex items-center gap-1.5">
+                {b.kind === "timer"
+                  ? <ClockIcon className="w-3.5 h-3.5 flex-shrink-0 text-emerald-500" />
+                  : <TvIcon className="w-3.5 h-3.5 flex-shrink-0 opacity-60" />}
+                <span className="truncate">{b.label}</span>
+              </div>
               <div className="text-[11px] opacity-70 tabular-nums">
                 {b.width}×{b.height} @ ({b.x},{b.y})
               </div>
@@ -476,6 +502,14 @@ function CanvasTab({ state, push }) {
           >
             <PlusIcon className="w-4 h-4" />
             Ajouter un bandeau
+          </button>
+          <button
+            type="button"
+            onClick={addTimer}
+            className="w-full inline-flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-xl border border-dashed border-emerald-400/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 cursor-pointer"
+          >
+            <ClockIcon className="w-4 h-4" />
+            Ajouter un chrono
           </button>
         </div>
 
@@ -504,7 +538,11 @@ function CanvasTab({ state, push }) {
                     top: Math.round(b.y * scale),
                     width: Math.max(1, Math.round(b.width * scale)),
                     height: Math.max(1, Math.round(b.height * scale)),
-                    background: isSel ? "rgba(251,191,36,0.22)" : "rgba(59,130,246,0.22)",
+                    background: isSel
+                      ? "rgba(251,191,36,0.22)"
+                      : b.kind === "timer"
+                      ? "rgba(16,185,129,0.25)"
+                      : "rgba(59,130,246,0.22)",
                     cursor: "pointer",
                     boxSizing: "border-box",
                   }}
@@ -527,7 +565,7 @@ function CanvasTab({ state, push }) {
               value={selected.label}
               onChange={(e) => updateBanner(selected.id, { label: e.target.value })}
               className="text-base font-semibold bg-transparent border-0 border-b border-transparent hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-zinc-500 focus:outline-none px-0 py-0.5 flex-1 min-w-0"
-              aria-label="Nom du bandeau"
+              aria-label="Nom de l'élément"
             />
             <button
               type="button"
@@ -590,6 +628,51 @@ function CanvasTab({ state, push }) {
             </div>
           </div>
 
+          {selected.kind === "timer" ? (
+            <div className="grid md:grid-cols-3 gap-4 mt-4 items-end">
+              <div>
+                <Label htmlFor="tscale">Taille du temps — {Number(selected.timeScale).toFixed(2)}×</Label>
+                <input
+                  id="tscale"
+                  type="range"
+                  min="0.5" max="1.5" step="0.05"
+                  value={selected.timeScale}
+                  onChange={(e) => updateBanner(selected.id, {
+                    timeScale: Math.min(1.5, Math.max(0.5, Number(e.target.value))),
+                  })}
+                  className="w-full mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="talign">Alignement</Label>
+                <select
+                  id="talign"
+                  value={selected.align}
+                  onChange={(e) => updateBanner(selected.id, { align: e.target.value })}
+                  className="w-full mt-1 rounded-xl border px-3 py-2 bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700"
+                >
+                  <option value="left">Gauche</option>
+                  <option value="center">Centré</option>
+                  <option value="right">Droite</option>
+                </select>
+              </div>
+              <label className="flex items-center gap-2 select-none cursor-pointer pb-2">
+                <input
+                  type="checkbox"
+                  checked={!!selected.showName}
+                  onChange={(e) => updateBanner(selected.id, { showName: e.target.checked })}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm">Afficher le nom du compétiteur</span>
+              </label>
+              <p className="md:col-span-3 text-xs opacity-60">
+                Le temps apparaît pendant la course et reste affiché jusqu'à ce que
+                l'arrivée soit validée ou annulée. L'élément reste noir quand le
+                chrono est désarmé ou qu'aucune course n'est en cours.
+              </p>
+            </div>
+          ) : (
+          <>
           <div className="grid md:grid-cols-3 gap-4 mt-4">
             <div>
               <Label htmlFor="bps">Entrées par page — {selected.pageSize}</Label>
@@ -639,10 +722,12 @@ function CanvasTab({ state, push }) {
             />
             <span className="text-sm">Afficher le logo Festival Western</span>
           </label>
+          </>
+          )}
         </div>
       ) : (
         <div className="mt-5 text-sm opacity-60 text-center py-6 border border-dashed border-zinc-300 dark:border-zinc-700 rounded-2xl">
-          Sélectionnez un bandeau dans la liste ou l'aperçu pour modifier ses propriétés.
+          Sélectionnez un élément dans la liste ou l'aperçu pour modifier ses propriétés.
         </div>
       )}
 

@@ -2,6 +2,7 @@ import React from "react";
 import useSyncedState from "../state/useSyncedState";
 import useFullscreenExit from "../hooks/useFullscreenExit";
 import BannerView from "../components/BannerView";
+import TimerDisplay from "../components/TimerDisplay";
 import { useOutputTimer } from "../hooks/useLiveTimer";
 
 const FALLBACK_CANVAS = { width: 1920, height: 1080, banners: [] };
@@ -11,6 +12,7 @@ export default function CanvasView() {
   const [state] = useSyncedState();
   const timerFrame = useOutputTimer({
     enabled: state.scoreMode === "lower" && state.timerArmed && state.showLiveTimer !== false,
+    pendingRun: state.pendingRun,
   });
   const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const canvas = state.canvas ?? FALLBACK_CANVAS;
@@ -45,16 +47,33 @@ export default function CanvasView() {
             overflow: "hidden",
           }}
         >
-          <BannerView
-            banner={cb}
-            entries={state.entries}
-            scoreMode={state.scoreMode}
-            eventName={state.eventName}
-            timerFrame={timerFrame}
-            competitor={state.bannerTimerShowName ? state.currentCompetitor : null}
-            width={cb.width}
-            height={cb.height}
-          />
+          {cb.kind === "timer" ? (
+            // Élément « Chrono » : fond noir, vide tant qu'il n'y a rien à montrer
+            // (chrono désarmé, ou aucune course en cours / en attente).
+            <div style={{ width: "100%", height: "100%", background: "#000" }}>
+              {timerFrame && (
+                <TimerDisplay
+                  seconds={timerFrame.seconds}
+                  competitor={cb.showName ? state.currentCompetitor : null}
+                  width={cb.width}
+                  height={cb.height}
+                  align={cb.align}
+                  scale={cb.timeScale}
+                />
+              )}
+            </div>
+          ) : (
+            <BannerView
+              banner={cb}
+              entries={state.entries}
+              scoreMode={state.scoreMode}
+              eventName={state.eventName}
+              timerFrame={timerFrame}
+              competitor={state.bannerTimerShowName ? state.currentCompetitor : null}
+              width={cb.width}
+              height={cb.height}
+            />
+          )}
         </div>
       ))}
 
@@ -69,7 +88,7 @@ export default function CanvasView() {
             fontSize: Math.round(Math.min(width, height) * 0.025),
           }}
         >
-          Aucun bandeau dans le canevas — ajoutez-en depuis Paramètres → Canevas.
+          Aucun élément dans le canevas — ajoutez-en depuis Paramètres → Canevas.
         </div>
       )}
     </div>

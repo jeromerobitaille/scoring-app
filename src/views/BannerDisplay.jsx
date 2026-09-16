@@ -15,6 +15,7 @@ export default function BannerDisplay() {
   const [state] = useSyncedState();
   const timerFrame = useOutputTimer({
     enabled: state.scoreMode === "lower" && state.timerArmed && state.showLiveTimer !== false,
+    pendingRun: state.pendingRun,
   });
   const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
 

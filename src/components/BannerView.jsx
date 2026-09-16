@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { computeRanking, formatScore, entryDisplayMode } from "../utils/score";
 import bannerLogo from "../assets/banner.jpg";
 import logo from "../assets/logo.png";
+import TimerDisplay from "./TimerDisplay";
 
 const BREAKING_MS = 5000;
 const ROTATE_MS = 5000;
@@ -19,7 +20,7 @@ const rankBadgeBg = (rank) => {
  * nom du compétiteur si l'option est active. Sous l'annonce « breaking »
  * (zIndex 50) pour qu'un résultat qu'on vient de saisir reste prioritaire.
  */
-function LiveTimerOverlay({ frame, competitor, unit, containerH }) {
+function LiveTimerOverlay({ frame, competitor, containerW, containerH }) {
   return (
     <motion.div
       key="live-timer"
@@ -32,38 +33,14 @@ function LiveTimerOverlay({ frame, competitor, unit, containerH }) {
         inset: 0,
         zIndex: 40,
         background: "linear-gradient(180deg,#000,#0b0b0b)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: Math.round(40 * unit),
-        color: "#fff",
       }}
     >
-      {competitor && (
-        <div
-          style={{
-            fontSize: Math.round(containerH * 0.3),
-            fontWeight: 800,
-            maxWidth: "50%",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {competitor}
-        </div>
-      )}
-      <div
-        style={{
-          fontSize: Math.round(containerH * 0.72),
-          lineHeight: 1,
-          fontWeight: 900,
-          fontVariantNumeric: "tabular-nums lining-nums",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {formatScore(frame.seconds, "time")}
-      </div>
+      <TimerDisplay
+        seconds={frame.seconds}
+        competitor={competitor}
+        width={containerW}
+        height={containerH}
+      />
     </motion.div>
   );
 }
@@ -204,7 +181,7 @@ export default function BannerView({
           </div>
         )}
         <AnimatePresence>
-          {timerFrame && <LiveTimerOverlay frame={timerFrame} competitor={competitor} unit={unit} containerH={containerH} />}
+          {timerFrame && <LiveTimerOverlay frame={timerFrame} competitor={competitor} containerW={containerW} containerH={containerH} />}
         </AnimatePresence>
       </div>
     );
@@ -354,7 +331,7 @@ export default function BannerView({
       </div>
 
       <AnimatePresence>
-        {timerFrame && <LiveTimerOverlay frame={timerFrame} competitor={competitor} unit={unit} containerH={containerH} />}
+        {timerFrame && <LiveTimerOverlay frame={timerFrame} competitor={competitor} containerW={containerW} containerH={containerH} />}
       </AnimatePresence>
 
       {/* Breaking news overlay */}

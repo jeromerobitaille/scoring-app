@@ -19,6 +19,7 @@ export default function DisplayView() {
   const [state] = useSyncedState();
   const timerFrame = useOutputTimer({
     enabled: state.scoreMode === "lower" && state.timerArmed && state.showLiveTimer !== false,
+    pendingRun: state.pendingRun,
   });
 
   useEffect(() => {

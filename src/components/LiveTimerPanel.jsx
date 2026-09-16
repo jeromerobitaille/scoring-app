@@ -21,6 +21,7 @@ export default function LiveTimerPanel({
   onArmedChange,
   competitorName,
   isTimerHost,
+  pendingSeconds = null,
 }) {
   const { frame, status, online } = useLiveTimer();
   const onStopRef = useRef(onStop);
@@ -56,7 +57,9 @@ export default function LiveTimerPanel({
   else if (connected) detail = `Chrono connecté — ${status.port}${frame?.eye ? ` · cellule ${frame.eye}` : ""}`;
   else detail = status?.error || "Recherche du chrono USB…";
   if (connected && armed && !isTimerHost) {
-    detail += " · la fenêtre d'arrivée s'ouvre sur l'ordinateur du chrono";
+    detail += pendingSeconds != null
+      ? ` · arrivée ${formatScore(pendingSeconds, "time")} en attente de validation sur l'ordinateur du chrono`
+      : " · la fenêtre d'arrivée s'ouvre sur l'ordinateur du chrono";
   }
 
   return (
