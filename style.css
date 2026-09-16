@@ -13,3 +13,13 @@
       font-weight: normal; /* Define weight if applicable, e.g., bold, light */
       font-style: normal; /* Define style if applicable, e.g., italic */
     }
+
+/* Chrono du canevas. Fichier embarqué dans l'application (pas de local()) pour
+   un rendu identique sur tous les ordinateurs, même sans la police installée. */
+@font-face {
+  font-family: 'Timmons NY';
+  src: url('./src/assets/fonts/TimmonsNY2.0-Regular.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}

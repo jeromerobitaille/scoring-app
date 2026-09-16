@@ -4,6 +4,7 @@ import { computeRanking, formatScore, entryDisplayMode } from "../utils/score";
 import bannerLogo from "../assets/banner.jpg";
 import logo from "../assets/logo.png";
 import TimerDisplay from "./TimerDisplay";
+import { bannerCardStyle } from "./bannerCard";
 
 const BREAKING_MS = 5000;
 const ROTATE_MS = 5000;
@@ -234,7 +235,6 @@ export default function BannerView({
               if (!e) return <div key={`empty-${colIdx}`} className="min-w-0" />;
 
               const displayRank = e.rank;
-              const chipRadius = Math.round(18 * unit);
               const nameLineHeight = Math.round(nameSize * 1.06);
               const numberCircle = Math.round(70 * unit);
 
@@ -247,11 +247,7 @@ export default function BannerView({
                       alignItems: "center",
                       gap: sep,
                       padding: `${chipPY} ${chipPX}`,
-                      borderRadius: chipRadius,
-                      backdropFilter: "blur(6px)",
-                      background: "rgba(30,30,30,0.6)",
-                      border: "2px solid rgba(255,255,255,0.15)",
-                      boxShadow: "0 6px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04)",
+                      ...bannerCardStyle(unit),
                       color: "#fff",
                       minWidth: 0,
                       width: "100%",
