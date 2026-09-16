@@ -4,12 +4,14 @@ const fs = require("node:fs");
 const { autoUpdater } = require("electron-updater");
 const { createServer } = require("../server/index.cjs");
 const { TimerReader, listPorts } = require("../server/timer.cjs");
+const { createStore } = require("../server/persist.cjs");
 
 const isDev = !app.isPackaged;
 const DEFAULT_PORT = Number(process.env.FWST_PORT) || 5050;
 
 let mainWindow = null;
 let serverInfo = null;
+let store = null;
 const timer = new TimerReader();
 
 function resolveStaticDir() {
@@ -23,8 +25,9 @@ function resolveStaticDir() {
 
 async function startServer() {
   const staticDir = resolveStaticDir();
+  store = createStore(app.getPath("userData"));
   try {
-    serverInfo = await createServer({ staticDir, port: DEFAULT_PORT });
+    serverInfo = await createServer({ staticDir, port: DEFAULT_PORT, store });
     console.log(`[fwst-scoring] HTTP+WS listening on :${serverInfo.port}`);
   } catch (err) {
     console.error("[fwst-scoring] Failed to start server:", err);
@@ -265,6 +268,62 @@ function setupIpc() {
     return { config: timer.config, status: timer.status };
   });
 
+  // ── Sauvegardes ──────────────────────────────────────────────
+  // Les dialogues natifs prennent le focus clavier du système : on le rend à la
+  // page ensuite (même précaution que pour les dialogues de mise à jour).
+  const refocus = (event) => {
+    try { event.sender.focus(); } catch { /* fenêtre fermée */ }
+  };
+
+  ipcMain.handle("backup:export", async (event, { json, defaultName }) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      title: "Exporter une sauvegarde",
+      defaultPath: path.join(app.getPath("documents"), defaultName || "fwst-sauvegarde.json"),
+      filters: [{ name: "Sauvegarde FWST", extensions: ["json"] }],
+    });
+    refocus(event);
+    if (canceled || !filePath) return { ok: false, canceled: true };
+    try {
+      fs.writeFileSync(filePath, json);
+      return { ok: true, path: filePath };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle("backup:import", async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: "Importer une sauvegarde",
+      defaultPath: app.getPath("documents"),
+      filters: [{ name: "Sauvegarde FWST", extensions: ["json"] }],
+      properties: ["openFile"],
+    });
+    refocus(event);
+    if (canceled || !filePaths?.[0]) return { ok: false, canceled: true };
+    try {
+      return { ok: true, text: fs.readFileSync(filePaths[0], "utf8"), path: filePaths[0] };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle("backup:list", () => store?.listBackups() ?? []);
+  ipcMain.handle("backup:read", (_event, name) => {
+    try {
+      return { ok: true, text: store.readBackup(name) };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+  ipcMain.handle("backup:reveal", async () => {
+    if (!store) return { ok: false };
+    fs.mkdirSync(store.backupDir, { recursive: true });
+    const error = await shell.openPath(store.backupDir);
+    return { ok: !error, error };
+  });
+
   ipcMain.handle("window:closeSelf", (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win && win !== mainWindow) win.close();
@@ -333,7 +392,10 @@ app.whenReady().then(async () => {
   });
 });
 
-app.on("before-quit", () => timer.stop());
+app.on("before-quit", () => {
+  timer.stop();
+  store?.flush();
+});
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();

@@ -5,6 +5,8 @@ export default class LocalSocket {
     this.ws = null;
     this.listeners = new Set();
     this.statusListeners = new Set();
+    this.emptyListeners = new Set();
+    this._unsent = null; // dernier état poussé pendant une coupure
     this._reconnectTimer = null;
     this._closedByUser = false;
     this._lastSentJSON = null;
@@ -24,6 +26,13 @@ export default class LocalSocket {
 
     this.ws.addEventListener("open", () => {
       this._setStatus("open");
+      // Une modification faite pendant la coupure part AVANT le join : le
+      // serveur renvoie alors cet état-là au lieu d'écraser la modification
+      // avec l'ancien.
+      if (this._unsent) {
+        this.send({ type: "state:push", room: this.roomId, state: this._unsent });
+        this._unsent = null;
+      }
       this.send({ type: "join", room: this.roomId });
     });
 
@@ -32,6 +41,8 @@ export default class LocalSocket {
         const msg = JSON.parse(ev.data);
         if (msg.type === "state:full" && msg.room === this.roomId && msg.state) {
           this.listeners.forEach((cb) => cb(msg.state));
+        } else if (msg.type === "state:empty" && msg.room === this.roomId) {
+          this.emptyListeners.forEach((cb) => cb());
         }
       } catch {}
     });
@@ -52,13 +63,18 @@ export default class LocalSocket {
     this._reconnectTimer = setTimeout(() => this.connect(), 1000);
   }
   on(cb) { this.listeners.add(cb); return () => this.listeners.delete(cb); }
+  onEmpty(cb) { this.emptyListeners.add(cb); return () => this.emptyListeners.delete(cb); }
   onStatus(cb) { this.statusListeners.add(cb); cb(this._status); return () => this.statusListeners.delete(cb); }
   send(obj) { if (this.ws?.readyState === 1) this.ws.send(JSON.stringify(obj)); }
   push(state) {
     const json = JSON.stringify(state);
     if (json === this._lastSentJSON) return;
     this._lastSentJSON = json;
-    this.send({ type: "state:push", room: this.roomId, state });
+    if (this.ws?.readyState === 1) {
+      this.send({ type: "state:push", room: this.roomId, state });
+    } else {
+      this._unsent = state;
+    }
   }
   close() {
     this._closedByUser = true;

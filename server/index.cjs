@@ -45,7 +45,7 @@ function serveFile(res, filePath) {
   });
 }
 
-function createServer({ staticDir, port = 5050, hubPath = "/live-score" }) {
+function createServer({ staticDir, port = 5050, hubPath = "/live-score", store = null }) {
   const server = http.createServer((req, res) => {
     if (!req.url) { res.statusCode = 400; return res.end(); }
 
@@ -74,7 +74,7 @@ function createServer({ staticDir, port = 5050, hubPath = "/live-score" }) {
     });
   });
 
-  const hub = attachHub(server, hubPath);
+  const hub = attachHub(server, hubPath, store);
 
   return new Promise((resolve, reject) => {
     const tryListen = (p) => {

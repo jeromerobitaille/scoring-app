@@ -5,7 +5,7 @@ export default function Tabs({ tabs, active, onChange }) {
     <div
       role="tablist"
       aria-orientation="horizontal"
-      className="inline-flex p-1 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white/60 dark:bg-zinc-900/60 backdrop-blur"
+      className="inline-flex flex-wrap justify-center p-1 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white/60 dark:bg-zinc-900/60 backdrop-blur"
     >
       {tabs.map((t) => {
         const isActive = t.id === active;

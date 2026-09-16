@@ -158,6 +158,8 @@ export default function useSyncedState() {
   }, []);
 
   const sockRef = useRef(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
   const [netStatus, setNetStatus] = useState(params.useNet ? "connecting" : "local");
 
   useEffect(() => saveState(state), [state]);
@@ -167,6 +169,12 @@ export default function useSyncedState() {
       const sock = new LocalSocket(wsURL, params.roomId);
       sockRef.current = sock;
       const offStatus = sock.onStatus(setNetStatus);
+      // Serveur sans données pour cette room (premier lancement de la version
+      // qui les enregistre sur disque) : l'app de bureau l'amorce avec les
+      // siennes. Pas une tablette, dont le cache pourrait être périmé.
+      const offEmpty = sock.onEmpty(() => {
+        if (window.fwst?.isElectron) sock.push(stateRef.current);
+      });
       sock.connect();
       const off = sock.on((incoming) => {
         const remote = normalizeState(incoming);
@@ -176,7 +184,7 @@ export default function useSyncedState() {
           return remote;
         });
       });
-      return () => { off(); offStatus(); sock.close(); };
+      return () => { off(); offStatus(); offEmpty(); sock.close(); };
     }
 
     setNetStatus("local");

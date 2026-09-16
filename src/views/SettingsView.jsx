@@ -17,6 +17,7 @@ import {
   ArrowPathIcon,
   UserGroupIcon,
   AdjustmentsHorizontalIcon,
+  ArchiveBoxIcon,
 } from "@heroicons/react/24/outline";
 import { ArrowLeftIcon } from "@heroicons/react/24/solid";
 import ShareConnection from "../components/ShareConnection";
@@ -26,6 +27,7 @@ import useLiveTimer, { TIMER_STATE_LABEL } from "../hooks/useLiveTimer";
 import { formatScore } from "../utils/score";
 import RodeosTab from "./settings/RodeosTab";
 import DisciplinesTab from "./settings/DisciplinesTab";
+import BackupTab from "./settings/BackupTab";
 
 function BannerPreview({ width, height }) {
   const w = Math.max(1, Number(width) || 0);
@@ -920,6 +922,7 @@ const TABS = [
   { id: "canvas", label: "Canevas",  icon: Squares2X2Icon },
   { id: "table",  label: "Tableau",  icon: ComputerDesktopIcon },
   { id: "timer",  label: "Chrono",   icon: ClockIcon },
+  { id: "backup", label: "Sauvegarde", icon: ArchiveBoxIcon },
 ];
 
 export default function SettingsView() {
@@ -961,7 +964,7 @@ export default function SettingsView() {
             </button>
             <div className="min-w-0">
               <h1 className="text-xl md:text-2xl font-bold leading-tight">Paramètres &amp; sorties</h1>
-              <p className="text-xs opacity-60">Rodéos, disciplines, chrono et affichages.</p>
+              <p className="text-xs opacity-60">Rodéos, disciplines, chrono, affichages et sauvegarde.</p>
             </div>
           </div>
           <ThemeToggle
@@ -981,6 +984,7 @@ export default function SettingsView() {
         {active === "canvas" && <CanvasTab state={state} push={push} />}
         {active === "table"  && <TableTab state={state} push={push} />}
         {active === "timer"  && <TimerTab state={state} push={push} />}
+        {active === "backup" && <BackupTab state={state} push={push} />}
       </div>
     </div>
   );

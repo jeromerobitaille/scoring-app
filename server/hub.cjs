@@ -1,9 +1,10 @@
 const { WebSocketServer } = require("ws");
 
-function attachHub(httpServer, path = "/live-score") {
+function attachHub(httpServer, path = "/live-score", store = null) {
   const wss = new WebSocketServer({ noServer: true });
   const rooms = new Map();
-  const roomState = new Map();
+  // État de chaque room, rechargé du disque au démarrage si un store est fourni.
+  const roomState = new Map(Object.entries(store?.load() ?? {}));
   // Clients abonnés au chrono. Le temps défile à ~23 trames/s : il circule sur
   // ce canal à part au lieu de passer par l'état synchronisé (localStorage).
   const timerSubs = new Set();
@@ -15,6 +16,9 @@ function attachHub(httpServer, path = "/live-score") {
     ws._room = room;
     if (roomState.has(room)) {
       ws.send(JSON.stringify({ type: "state:full", room, state: roomState.get(room) }));
+    } else {
+      // Rien encore pour cette room : l'app de bureau peut l'amorcer avec ses données.
+      ws.send(JSON.stringify({ type: "state:empty", room }));
     }
   }
 
@@ -65,6 +69,7 @@ function attachHub(httpServer, path = "/live-score") {
       }
       if (msg.type === "state:push" && msg.room && msg.state) {
         roomState.set(msg.room, msg.state);
+        store?.save(Object.fromEntries(roomState));
         broadcast(msg.room, { type: "state:full", room: msg.room, state: msg.state }, ws);
         return;
       }
@@ -82,7 +87,10 @@ function attachHub(httpServer, path = "/live-score") {
     });
   }, 30000);
 
-  httpServer.on("close", () => clearInterval(interval));
+  httpServer.on("close", () => {
+    clearInterval(interval);
+    store?.flush();
+  });
 
   function publishTimer(kind, payload) {
     if (kind === "frame") lastTimer.frame = payload;
