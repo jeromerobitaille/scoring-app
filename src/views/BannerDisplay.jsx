@@ -2,7 +2,7 @@ import React from "react";
 import useSyncedState from "../state/useSyncedState";
 import useFullscreenExit from "../hooks/useFullscreenExit";
 import BannerView from "../components/BannerView";
-import { useOutputTimer } from "../hooks/useLiveTimer";
+import { useOutputTimer, HOLD_TIME_MODE_MS, HOLD_SCORE_MODE_MS } from "../hooks/useLiveTimer";
 
 const FALLBACK_BANNER = {
   width: 2592, height: 216,
@@ -14,8 +14,9 @@ export default function BannerDisplay() {
   useFullscreenExit();
   const [state] = useSyncedState();
   const timerFrame = useOutputTimer({
-    enabled: state.scoreMode === "lower" && state.timerArmed && state.showLiveTimer !== false,
+    enabled: state.timerArmed && state.showLiveTimer !== false,
     pendingRun: state.pendingRun,
+    holdMs: state.scoreMode === "lower" ? HOLD_TIME_MODE_MS : HOLD_SCORE_MODE_MS,
   });
   const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
 
@@ -36,6 +37,7 @@ export default function BannerDisplay() {
       eventName={state.eventName}
       timerFrame={timerFrame}
       competitor={state.bannerTimerShowName ? state.currentCompetitor : null}
+      timerTarget={state.timerTarget}
       width={width}
       height={height}
     />

@@ -406,7 +406,9 @@ export default function ControlView() {
   }
 
   function handleTimerStop(frame) {
-    if (!isTimerHost || !armed || pendingRun) return;
+    // Pas de fenêtre d'arrivée en pointage : la note vient des juges, le chrono
+    // sert seulement à suivre la monte en direct.
+    if (!isTimeMode || !isTimerHost || !armed || pendingRun) return;
     push({
       ...state,
       pendingRun: {
@@ -567,6 +569,7 @@ export default function ControlView() {
           >
             {isTimeMode ? "Temps · plus bas = meilleur" : "Pointage · plus haut = meilleur"}
             {discipline.penalties.length > 0 && ` · pénalités ${discipline.penalties.map((p) => `+${p}`).join("/")}`}
+            {discipline.timerTarget != null && ` · cible ${discipline.timerTarget} s`}
           </button>
         </div>
 
@@ -583,17 +586,17 @@ export default function ControlView() {
           </div>
 
           <div className="lg:col-span-8 space-y-4 min-w-0">
-            {isTimeMode && (
-              <LiveTimerPanel
-                onStop={handleTimerStop}
-                onOpenSettings={() => openSettings("timer")}
-                armed={armed}
-                onArmedChange={(v) => push({ ...state, timerArmed: v })}
-                isTimerHost={isTimerHost}
-                pendingSeconds={pendingRun?.seconds ?? null}
-                competitorName={current?.name}
-              />
-            )}
+            <LiveTimerPanel
+              onStop={handleTimerStop}
+              onOpenSettings={() => openSettings("timer")}
+              armed={armed}
+              onArmedChange={(v) => push({ ...state, timerArmed: v })}
+              isTimerHost={isTimerHost}
+              pendingSeconds={pendingRun?.seconds ?? null}
+              competitorName={current?.name}
+              withFinishDialog={isTimeMode}
+              target={discipline.timerTarget}
+            />
 
             <Card>
               <div className="flex items-center justify-between gap-3 mb-3">

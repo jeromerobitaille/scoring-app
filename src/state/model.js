@@ -3,7 +3,9 @@
  *
  * Source de vérité :
  *   disciplines        [{ id, name, scoreMode: "lower"|"higher", penalties: [5, 10, 15],
- *                         armedByDefault }]
+ *                         armedByDefault, timerTarget: 8 | null }]
+ *                      timerTarget : temps à atteindre (ex. 8 s en monte) — le
+ *                      chrono change de couleur quand il est atteint.
  *   rodeos             [{ id, name, competitions: { [disciplineId]: Competition } }]
  *   currentRodeoId, currentDisciplineId
  *   pendingRun         { seconds, eye, session, runId } | null — arrivée en
@@ -19,7 +21,7 @@
  *
  * Miroir de la compétition active, recalculé par normalizeState() à chaque
  * écriture. Les sorties (tableau, bandeaux, canevas) ne lisent que ces champs :
- *   eventName, scoreMode, entries, currentCompetitor (+ timerArmed)
+ *   eventName, scoreMode, entries, currentCompetitor (+ timerArmed, timerTarget)
  */
 
 const newId = () =>
@@ -33,14 +35,14 @@ export const BARREL_PENALTIES = [5, 10, 15];
 
 // Réglages par défaut à vérifier dans Paramètres → Disciplines.
 export const DEFAULT_DISCIPLINES = [
-  { name: "Monte de chevaux sans selle", scoreMode: "higher", penalties: [], armedByDefault: false },
+  { name: "Monte de chevaux sans selle", scoreMode: "higher", penalties: [], armedByDefault: true, timerTarget: 8 },
   { name: "Course de sauvetage", scoreMode: "lower", penalties: [], armedByDefault: false },
   { name: "Prise du veau au lasso", scoreMode: "lower", penalties: [], armedByDefault: false },
-  { name: "Monte de chevaux avec selle", scoreMode: "higher", penalties: [], armedByDefault: false },
+  { name: "Monte de chevaux avec selle", scoreMode: "higher", penalties: [], armedByDefault: true, timerTarget: 8 },
   { name: "Course de barils | Femmes", scoreMode: "lower", penalties: BARREL_PENALTIES, armedByDefault: true },
   { name: "Échange de cavaliers", scoreMode: "lower", penalties: [], armedByDefault: false },
   { name: "Terrassement du bouvillon", scoreMode: "lower", penalties: [], armedByDefault: false },
-  { name: "Monte de taureaux", scoreMode: "higher", penalties: [], armedByDefault: false },
+  { name: "Monte de taureaux", scoreMode: "higher", penalties: [], armedByDefault: true, timerTarget: 8 },
 ];
 
 const EMPTY_COMPETITION = Object.freeze({ roster: [], entries: [], currentId: null });
@@ -53,13 +55,25 @@ export function parsePenalties(input) {
   return [...new Set(out)].sort((a, b) => a - b);
 }
 
+export const RIDE_TARGET = 8;
+
+export function parseTarget(input) {
+  const n = Number(String(input ?? "").replace(",", ".").trim());
+  return String(input ?? "").trim() !== "" && Number.isFinite(n) && n > 0 ? n : null;
+}
+
 function normalizeDiscipline(d) {
+  const scoreMode = d?.scoreMode === "lower" ? "lower" : "higher";
   return {
     id: d?.id || newId(),
     name: String(d?.name ?? "").trim() || "Discipline",
-    scoreMode: d?.scoreMode === "lower" ? "lower" : "higher",
+    scoreMode,
     penalties: parsePenalties(d?.penalties),
     armedByDefault: Boolean(d?.armedByDefault),
+    // Disciplines créées avant ce réglage : 8 s en pointage (montes), rien en temps.
+    timerTarget: d?.timerTarget === undefined
+      ? (scoreMode === "higher" ? RIDE_TARGET : null)
+      : parseTarget(d.timerTarget),
   };
 }
 
@@ -131,11 +145,10 @@ export function normalizeState(input) {
   const comp = rodeo.competitions[discipline.id] ?? EMPTY_COMPETITION;
   const current = comp.roster.find((p) => p.id === comp.currentId);
 
-  // Nouvelle discipline → état armé par défaut de celle-ci. Jamais armé en pointage.
-  let timerArmed = state.timerArmedFor === discipline.id
+  // Nouvelle discipline → état armé par défaut de celle-ci.
+  const timerArmed = state.timerArmedFor === discipline.id
     ? state.timerArmed === true
     : discipline.armedByDefault;
-  timerArmed = timerArmed && discipline.scoreMode === "lower";
   const sameDiscipline = state.timerArmedFor === discipline.id;
   const pendingRun = sameDiscipline && discipline.scoreMode === "lower" && state.pendingRun
     ? state.pendingRun
@@ -149,6 +162,7 @@ export function normalizeState(input) {
     currentDisciplineId: discipline.id,
     timerArmed,
     timerArmedFor: discipline.id,
+    timerTarget: discipline.timerTarget,
     pendingRun,
     eventName: discipline.name,
     scoreMode: discipline.scoreMode,

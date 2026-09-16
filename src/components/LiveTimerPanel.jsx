@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import useLiveTimer, { TIMER_STATE_LABEL } from "../hooks/useLiveTimer";
 import { formatScore } from "../utils/score";
+import { targetReached, TARGET_REACHED_COLOR } from "../hooks/useLiveTimer";
 
 const BADGE = {
   running: "bg-amber-400 text-zinc-900 animate-pulse",
@@ -22,6 +23,8 @@ export default function LiveTimerPanel({
   competitorName,
   isTimerHost,
   pendingSeconds = null,
+  withFinishDialog = true,
+  target = null,
 }) {
   const { frame, status, online } = useLiveTimer();
   const onStopRef = useRef(onStop);
@@ -56,7 +59,7 @@ export default function LiveTimerPanel({
   else if (disabled) detail = "Lecture du chrono désactivée.";
   else if (connected) detail = `Chrono connecté — ${status.port}${frame?.eye ? ` · cellule ${frame.eye}` : ""}`;
   else detail = status?.error || "Recherche du chrono USB…";
-  if (connected && armed && !isTimerHost) {
+  if (connected && armed && !isTimerHost && withFinishDialog) {
     detail += pendingSeconds != null
       ? ` · arrivée ${formatScore(pendingSeconds, "time")} en attente de validation sur l'ordinateur du chrono`
       : " · la fenêtre d'arrivée s'ouvre sur l'ordinateur du chrono";
@@ -78,7 +81,11 @@ export default function LiveTimerPanel({
             ? "border-emerald-600 bg-emerald-600 text-white"
             : "border-zinc-300 dark:border-zinc-700")
         }
-        title="Armé : le chrono s'affiche sur les sorties et une fenêtre s'ouvre à l'arrivée pour valider le temps"
+        title={
+          withFinishDialog
+            ? "Armé : le chrono s'affiche sur les sorties et une fenêtre s'ouvre à l'arrivée pour valider le temps"
+            : "Armé : le chrono s'affiche en direct sur les sorties"
+        }
       >
         <input
           type="checkbox"
@@ -93,6 +100,7 @@ export default function LiveTimerPanel({
           connected ? "" : "opacity-30"
         }`}
         aria-live="off"
+        style={connected && frame && targetReached(frame.seconds, target) ? { color: TARGET_REACHED_COLOR } : undefined}
       >
         {connected && frame ? formatScore(frame.seconds, "time") : "–.–––"}
       </div>

@@ -4,7 +4,7 @@ import useSyncedState from "../state/useSyncedState";
 import useFullscreenExit from "../hooks/useFullscreenExit";
 import { computeRanking, formatScore, entryDisplayMode } from "../utils/score";
 import logo from "../assets/logo.png";
-import { useOutputTimer } from "../hooks/useLiveTimer";
+import { useOutputTimer, HOLD_TIME_MODE_MS, HOLD_SCORE_MODE_MS, targetReached, TARGET_REACHED_COLOR } from "../hooks/useLiveTimer";
 
 
 const rankBadgeBg = (rank) => {
@@ -18,8 +18,9 @@ export default function DisplayView() {
   useFullscreenExit();
   const [state] = useSyncedState();
   const timerFrame = useOutputTimer({
-    enabled: state.scoreMode === "lower" && state.timerArmed && state.showLiveTimer !== false,
+    enabled: state.timerArmed && state.showLiveTimer !== false,
     pendingRun: state.pendingRun,
+    holdMs: state.scoreMode === "lower" ? HOLD_TIME_MODE_MS : HOLD_SCORE_MODE_MS,
   });
 
   useEffect(() => {
@@ -99,7 +100,10 @@ export default function DisplayView() {
               >
                 {timerFrame.state === "running" ? "Chrono" : "Temps"}
               </span>
-              <span className="text-7xl md:text-9xl font-black tabular-nums leading-none">
+              <span
+                className="text-7xl md:text-9xl font-black tabular-nums leading-none"
+                style={targetReached(timerFrame.seconds, state.timerTarget) ? { color: TARGET_REACHED_COLOR } : undefined}
+              >
                 {formatScore(timerFrame.seconds, "time")}
               </span>
               <span className="text-2xl md:text-4xl opacity-70">sec</span>

@@ -7,7 +7,7 @@ import {
 } from "@heroicons/react/24/outline";
 import Card from "../../components/ui/Card";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
-import { newId, parsePenalties, BARREL_PENALTIES } from "../../state/model";
+import { newId, parsePenalties, parseTarget, BARREL_PENALTIES, RIDE_TARGET } from "../../state/model";
 
 const INPUT =
   "w-full min-w-0 rounded-xl border px-3 py-2 text-sm outline-none bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700";
@@ -78,19 +78,23 @@ export default function DisciplinesTab({ state, push }) {
           Chaque discipline a son mode de pointage : l'écran de saisie s'adapte
           automatiquement quand on change de discipline. Les pénalités proposées à
           l'arrivée (ex. barils renversés) se règlent ici — laisser vide si aucune.
-          « Chrono armé par défaut » arme le chrono en passant à cette discipline ; un
-          chrono désarmé n'apparaît pas sur le tableau, les bandeaux ni le canevas.
+          « Armé par défaut » arme le chrono en passant à cette discipline ; un chrono
+          désarmé n'apparaît pas sur le tableau, les bandeaux ni le canevas. En mode
+          pointage, le chrono sert à suivre la monte en direct (pas de fenêtre
+          d'arrivée) ; le « temps cible » (ex. 8 s) le fait changer de couleur une
+          fois atteint.
         </p>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[820px] text-sm">
+        <table className="w-full min-w-[940px] text-sm">
           <thead className="text-left text-zinc-600 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
             <tr>
               <th className="py-2 pr-2 w-16">Ordre</th>
               <th className="py-2 pr-2">Nom</th>
               <th className="py-2 pr-2 w-60">Mode</th>
               <th className="py-2 pr-2 w-44">Pénalités (s)</th>
+              <th className="py-2 pr-2 w-28" title="Le chrono change de couleur quand ce temps est atteint">Temps cible (s)</th>
               <th className="py-2 pr-2 w-24 text-center" title="Chrono armé en passant à cette discipline">Armé par défaut</th>
               <th className="py-2 w-10" />
             </tr>
@@ -148,15 +152,23 @@ export default function DisciplinesTab({ state, push }) {
                     onCommit={(text) => update(d.id, { penalties: parsePenalties(text) })}
                   />
                 </td>
+                <td className="py-2 pr-2">
+                  <CommitInput
+                    aria-label={`Temps cible pour ${d.name}`}
+                    className={INPUT}
+                    inputMode="decimal"
+                    placeholder={d.scoreMode === "higher" ? `ex. ${RIDE_TARGET}` : "Aucun"}
+                    value={d.timerTarget == null ? "" : String(d.timerTarget)}
+                    onCommit={(text) => update(d.id, { timerTarget: parseTarget(text) })}
+                  />
+                </td>
                 <td className="py-2 pr-2 text-center">
                   <input
                     type="checkbox"
                     aria-label={`Chrono armé par défaut pour ${d.name}`}
-                    title={d.scoreMode === "lower" ? "" : "Sans objet en mode pointage"}
-                    checked={d.scoreMode === "lower" && d.armedByDefault}
-                    disabled={d.scoreMode !== "lower"}
+                    checked={d.armedByDefault}
                     onChange={(e) => update(d.id, { armedByDefault: e.target.checked })}
-                    className="w-4 h-4 disabled:opacity-30"
+                    className="w-4 h-4"
                   />
                 </td>
                 <td className="py-2 text-right">

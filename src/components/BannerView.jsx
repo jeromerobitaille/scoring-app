@@ -21,7 +21,7 @@ const rankBadgeBg = (rank) => {
  * nom du compétiteur si l'option est active. Sous l'annonce « breaking »
  * (zIndex 50) pour qu'un résultat qu'on vient de saisir reste prioritaire.
  */
-function LiveTimerOverlay({ frame, competitor, containerW, containerH }) {
+function LiveTimerOverlay({ frame, competitor, target, containerW, containerH }) {
   return (
     <motion.div
       key="live-timer"
@@ -41,6 +41,7 @@ function LiveTimerOverlay({ frame, competitor, containerW, containerH }) {
         competitor={competitor}
         width={containerW}
         height={containerH}
+        target={target}
       />
     </motion.div>
   );
@@ -60,6 +61,7 @@ export default function BannerView({
   height,
   timerFrame = null,
   competitor = null,
+  timerTarget = null,
 }) {
   const containerW = Math.max(64, Number(width) || 0);
   const containerH = Math.max(32, Number(height) || 0);
@@ -182,7 +184,7 @@ export default function BannerView({
           </div>
         )}
         <AnimatePresence>
-          {timerFrame && <LiveTimerOverlay frame={timerFrame} competitor={competitor} containerW={containerW} containerH={containerH} />}
+          {timerFrame && <LiveTimerOverlay frame={timerFrame} competitor={competitor} target={timerTarget} containerW={containerW} containerH={containerH} />}
         </AnimatePresence>
       </div>
     );
@@ -327,7 +329,7 @@ export default function BannerView({
       </div>
 
       <AnimatePresence>
-        {timerFrame && <LiveTimerOverlay frame={timerFrame} competitor={competitor} containerW={containerW} containerH={containerH} />}
+        {timerFrame && <LiveTimerOverlay frame={timerFrame} competitor={competitor} target={timerTarget} containerW={containerW} containerH={containerH} />}
       </AnimatePresence>
 
       {/* Breaking news overlay */}

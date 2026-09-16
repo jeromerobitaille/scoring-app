@@ -4,7 +4,7 @@ import useFullscreenExit from "../hooks/useFullscreenExit";
 import BannerView from "../components/BannerView";
 import TimerDisplay from "../components/TimerDisplay";
 import { bannerCardStyle } from "../components/bannerCard";
-import { useOutputTimer } from "../hooks/useLiveTimer";
+import { useOutputTimer, HOLD_TIME_MODE_MS, HOLD_SCORE_MODE_MS } from "../hooks/useLiveTimer";
 
 const FALLBACK_CANVAS = { width: 1920, height: 1080, banners: [] };
 
@@ -17,8 +17,9 @@ export default function CanvasView() {
     document.fonts?.load("64px 'Timmons NY'").catch(() => {});
   }, []);
   const timerFrame = useOutputTimer({
-    enabled: state.scoreMode === "lower" && state.timerArmed && state.showLiveTimer !== false,
+    enabled: state.timerArmed && state.showLiveTimer !== false,
     pendingRun: state.pendingRun,
+    holdMs: state.scoreMode === "lower" ? HOLD_TIME_MODE_MS : HOLD_SCORE_MODE_MS,
   });
   const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const canvas = state.canvas ?? FALLBACK_CANVAS;
@@ -75,6 +76,7 @@ export default function CanvasView() {
                     align={cb.align}
                     scale={cb.timeScale}
                     font="timmons"
+                    target={state.timerTarget}
                   />
                 </div>
               )}
@@ -87,6 +89,7 @@ export default function CanvasView() {
               eventName={state.eventName}
               timerFrame={timerFrame}
               competitor={state.bannerTimerShowName ? state.currentCompetitor : null}
+              timerTarget={state.timerTarget}
               width={cb.width}
               height={cb.height}
             />

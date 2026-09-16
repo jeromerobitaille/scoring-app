@@ -1,5 +1,6 @@
 import React from "react";
 import { formatScore } from "../utils/score";
+import { targetReached, TARGET_REACHED_COLOR } from "../hooks/useLiveTimer";
 
 /**
  * Métriques des polices, en fraction de la taille de police (em).
@@ -59,6 +60,7 @@ export default function TimerDisplay({
   align = "center",
   scale = 1,
   font = "default",
+  target = null,
 }) {
   const m = FONTS[font] ?? FONTS.default;
   const text = formatScore(seconds, "time");
@@ -131,6 +133,8 @@ export default function TimerDisplay({
           transform: shift,
           whiteSpace: "nowrap",
           flexShrink: 0,
+          color: targetReached(seconds, target) ? TARGET_REACHED_COLOR : undefined,
+          transition: "color 0.2s",
         }}
       >
         {m.fixedDigits

@@ -66,9 +66,18 @@ export const TIMER_STATE_LABEL = {
   unknown: "En attente",
 };
 
-// Juste après l'arrêt, le temps reste affiché le temps que la course en
-// attente (pendingRun) arrive du poste du chrono — évite un clignotement.
-const HOLD_AFTER_STOP_MS = 2000;
+// Mode temps : juste après l'arrêt, le temps reste affiché le temps que la
+// course en attente (pendingRun) arrive du poste du chrono — évite un clignotement.
+// Mode pointage (pas de fenêtre d'arrivée) : le temps final reste quelques secondes.
+export const HOLD_TIME_MODE_MS = 2000;
+export const HOLD_SCORE_MODE_MS = 6000;
+
+/** Couleur du temps une fois la cible atteinte (ex. 8 s en monte). */
+export const TARGET_REACHED_COLOR = "#34d399";
+
+export function targetReached(seconds, target) {
+  return target != null && seconds >= target;
+}
 
 /**
  * Chrono à afficher sur une sortie (tableau, bandeau, canevas), ou null.
@@ -77,7 +86,7 @@ const HOLD_AFTER_STOP_MS = 2000;
  *   ou annulée sur le poste du chrono (`pendingRun`, état partagé) ;
  * - jamais pour un temps arrêté dont on n'a pas vu la course (ex. au branchement).
  */
-export function useOutputTimer({ enabled, pendingRun = null }) {
+export function useOutputTimer({ enabled, pendingRun = null, holdMs = HOLD_TIME_MODE_MS }) {
   const { frame } = useLiveTimer({ enabled });
   const seenRunRef = useRef(null); // `${session}:${runId}` de la dernière course vue en marche
   const [held, setHeld] = useState(null); // clé de la course dont on affiche l'arrivée
@@ -94,11 +103,11 @@ export function useOutputTimer({ enabled, pendingRun = null }) {
     }
     if (state === "stopped" && seenRunRef.current === key) {
       setHeld(key);
-      const t = setTimeout(() => setHeld((k) => (k === key ? null : k)), HOLD_AFTER_STOP_MS);
+      const t = setTimeout(() => setHeld((k) => (k === key ? null : k)), holdMs);
       return () => clearTimeout(t);
     }
     if (state === "ready") setHeld(null);
-  }, [key, state]);
+  }, [key, state, holdMs]);
 
   if (!enabled) return null;
   if (frame && state === "running") return frame;
