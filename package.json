@@ -23,7 +23,7 @@
     "electron:dev": "npm run build && electron .",
     "electron:pack": "npm run build && electron-builder --dir",
     "electron:make": "npm run build && electron-builder -mw",
-    "electron:make:mac": "npm run build && electron-builder --mac",
+    "electron:make:mac": "npm run build && electron-builder --mac --arm64 && electron-builder --mac --x64",
     "electron:make:win": "npm run build && electron-builder --win",
     "electron:publish:mac:arm64": "electron-builder --mac --arm64 --publish always",
     "electron:publish:mac:x64": "electron-builder --mac --x64 --publish always",
@@ -85,11 +85,7 @@
       "category": "public.app-category.sports",
       "target": [
         {
-          "target": "dmg",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
+          "target": "dmg"
         }
       ],
       "icon": "build/icon.icns",
