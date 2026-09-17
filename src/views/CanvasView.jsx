@@ -90,6 +90,7 @@ export default function CanvasView() {
               timerFrame={timerFrame}
               competitor={state.bannerTimerShowName ? state.currentCompetitor : null}
               timerTarget={state.timerTarget}
+              contextKey={`${state.currentRodeoId}:${state.currentDisciplineId}`}
               width={cb.width}
               height={cb.height}
             />

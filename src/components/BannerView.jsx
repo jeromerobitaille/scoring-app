@@ -62,6 +62,7 @@ export default function BannerView({
   timerFrame = null,
   competitor = null,
   timerTarget = null,
+  contextKey = null,
 }) {
   const containerW = Math.max(64, Number(width) || 0);
   const containerH = Math.max(32, Number(height) || 0);
@@ -90,45 +91,63 @@ export default function BannerView({
     if (pageIndex >= pageCount) setPageIndex(0);
   }, [pageIndex, pageCount]);
 
-  // Breaking news state
+  // Annonce « nouveau résultat »
   const [breaking, setBreaking] = useState(null);
   const seenIdsRef = useRef(new Set());
   const lastParsedRef = useRef(new Map());
+  const contextRef = useRef(null);
 
+  // Détection seulement : cet effet se relance à chaque état reçu (la liste est
+  // recréée même sans changement de résultats), il ne doit donc gérer aucun
+  // minuteur — sinon il annule celui qui ferme l'annonce et elle reste figée.
   useEffect(() => {
-    if (seenIdsRef.current.size === 0 && ranked.length > 0) {
-      ranked.forEach((e) => seenIdsRef.current.add(e.id));
-      ranked.forEach((e) => lastParsedRef.current.set(e.id, e.parsed));
+    // Nouvelle compétition (ou premier rendu) : les résultats déjà là ne sont
+    // pas des nouveautés.
+    if (contextRef.current !== contextKey) {
+      contextRef.current = contextKey;
+      seenIdsRef.current = new Set(ranked.map((e) => e.id));
+      lastParsedRef.current = new Map(ranked.map((e) => [e.id, e.parsed]));
+      setBreaking(null);
       return;
     }
 
     const unseen = ranked.filter((e) => !seenIdsRef.current.has(e.id));
+    let announce = null;
     if (unseen.length > 0) {
-      let best = unseen[0];
-      let bestIdx = ranked.findIndex((r) => r.id === best.id);
-      for (const e of unseen) {
-        const idx = ranked.findIndex((r) => r.id === e.id);
-        if (idx !== -1 && idx < bestIdx) { best = e; bestIdx = idx; }
-      }
-      const scoreText = formatScore(best.parsed, entryDisplayMode(best, scoreMode));
-      setBreaking({ id: best.id, name: best.name, scoreText, rank: best.rank });
+      // ranked est trié : le premier non vu est le mieux classé.
+      announce = unseen[0];
       unseen.forEach((e) => seenIdsRef.current.add(e.id));
-      const t = setTimeout(() => setBreaking(null), BREAKING_MS);
-      return () => clearTimeout(t);
+    } else {
+      announce = ranked.find((e) => {
+        const prev = lastParsedRef.current.get(e.id);
+        return prev !== undefined && prev !== e.parsed && e.parsed != null;
+      }) ?? null;
     }
+    lastParsedRef.current = new Map(ranked.map((e) => [e.id, e.parsed]));
 
-    for (const e of ranked) {
-      const prev = lastParsedRef.current.get(e.id);
-      if (prev !== undefined && prev !== e.parsed && e.parsed != null) {
-        const scoreText = formatScore(e.parsed, entryDisplayMode(e, scoreMode));
-        setBreaking({ id: e.id, name: e.name, scoreText, rank: e.rank });
-        const t = setTimeout(() => setBreaking(null), BREAKING_MS);
-        lastParsedRef.current.set(e.id, e.parsed);
-        return () => clearTimeout(t);
-      }
-      lastParsedRef.current.set(e.id, e.parsed);
+    if (announce) {
+      setBreaking({
+        key: `${announce.id}:${announce.parsed}:${Date.now()}`,
+        id: announce.id,
+        name: announce.name,
+        scoreText: formatScore(announce.parsed, entryDisplayMode(announce, scoreMode)),
+        rank: announce.rank,
+      });
     }
-  }, [ranked, scoreMode]);
+  }, [ranked, scoreMode, contextKey]);
+
+  // Fermeture : ne dépend que de l'annonce affichée.
+  useEffect(() => {
+    if (!breaking) return;
+    const t = setTimeout(() => setBreaking(null), BREAKING_MS);
+    return () => clearTimeout(t);
+  }, [breaking]);
+
+  // Une nouvelle course passe avant l'annonce : le chrono doit rester visible.
+  const timerRunning = timerFrame?.state === "running";
+  useEffect(() => {
+    if (timerRunning) setBreaking(null);
+  }, [timerRunning]);
 
   // UI tokens
   const padX = Math.round(40 * unit);
@@ -334,9 +353,9 @@ export default function BannerView({
 
       {/* Breaking news overlay */}
       <AnimatePresence>
-        {breaking && (
+        {breaking && !timerRunning && (
           <motion.div
-            key={`breaking-${breaking.id}-${breaking.scoreText}`}
+            key={`breaking-${breaking.key}`}
             initial={{ y: -containerH, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -containerH, opacity: 0 }}

@@ -87,6 +87,8 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // Chrono et animations continuent même fenêtre cachée ou couverte.
+      backgroundThrottling: false,
       preload: path.join(__dirname, "preload.cjs"),
     },
   });
@@ -97,7 +99,13 @@ function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     // External links open in default browser
     if (url.startsWith("http://127.0.0.1") || url.startsWith("http://localhost")) {
-      return { action: "allow" };
+      // Sorties ouvertes sans plein écran (window.open) : mêmes réglages.
+      return {
+        action: "allow",
+        overrideBrowserWindowOptions: {
+          webPreferences: { backgroundThrottling: false },
+        },
+      };
     }
     shell.openExternal(url);
     return { action: "deny" };
@@ -243,6 +251,9 @@ function setupIpc() {
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
+        // Une sortie peut être captée (broadcast) alors qu'elle est couverte par
+        // une autre fenêtre : ne pas suspendre ses animations ni ses minuteurs.
+        backgroundThrottling: false,
         preload: path.join(__dirname, "preload.cjs"),
       },
     });

@@ -38,6 +38,7 @@ export default function BannerDisplay() {
       timerFrame={timerFrame}
       competitor={state.bannerTimerShowName ? state.currentCompetitor : null}
       timerTarget={state.timerTarget}
+      contextKey={`${state.currentRodeoId}:${state.currentDisciplineId}`}
       width={width}
       height={height}
     />
