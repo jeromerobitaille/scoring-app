@@ -55,6 +55,15 @@ function previewContext(state, liveFrame, sim, useSample) {
   return { ...ctx, ranked, byCompetitor, current, timerFrame, outputState: outputStateOf(ranked, timerFrame) };
 }
 
+/**
+ * L'élément appartient-il à l'état affiché ? On travaille un état à la fois :
+ * les calques des autres états (ou sans compétiteur) ne sont ni dessinés ni
+ * listés. L'œil (visible) ne compte pas : un calque masqué reste éditable.
+ */
+function inState(el, ctx) {
+  return isElementShown({ ...el, visible: true }, ctx);
+}
+
 /** Scène à l'échelle de l'espace disponible ; les éléments se déplacent à la souris, poignée pour la taille. */
 function Stage({ output, ctx, selectedId, onSelect, onMove, onNudge, onDelete }) {
   const wrapRef = useRef(null);
@@ -120,15 +129,14 @@ function Stage({ output, ctx, selectedId, onSelect, onMove, onNudge, onDelete })
         <div style={{ width: output.width, height: output.height, transform: `scale(${scale})`, transformOrigin: "top left", position: "absolute", top: 0, left: 0, pointerEvents: "none" }}>
           <OutputStage output={output} ctx={ctx} />
         </div>
-        {output.elements.map((el) => {
+        {output.elements.filter((el) => inState(el, ctx)).map((el) => {
           const sel = el.id === selectedId;
-          const shown = isElementShown(el, ctx);
           return (
             <div
               key={el.id}
               onMouseDown={(e) => { onSelect(el.id); startDrag(e, el, "move"); }}
-              title={`${el.name} — ${el.width}×${el.height} @ (${el.x},${el.y})${shown ? "" : " · masqué dans cet état"}`}
-              className={sel ? "ring-2 ring-amber-400 z-10" : shown ? "hover:ring-1 hover:ring-white/70" : "ring-1 ring-dashed ring-white/15 hover:ring-white/60"}
+              title={`${el.name} — ${el.width}×${el.height} @ (${el.x},${el.y})${el.visible ? "" : " · masqué (œil)"}`}
+              className={sel ? "ring-2 ring-amber-400 z-10" : el.visible ? "hover:ring-1 hover:ring-white/70" : "ring-1 ring-dashed ring-white/25 hover:ring-white/60"}
               style={{
                 position: "absolute",
                 left: Math.round(el.x * scale),
@@ -269,7 +277,9 @@ export default function EditorView() {
 
   // ── Éléments ─────────────────────────────────────────────────────────
   const elements = output?.elements ?? [];
-  const selected = elements.find((e) => e.id === selectedId) ?? null;
+  const visibleElements = elements.filter((e) => inState(e, ctx));
+  const hiddenCount = elements.length - visibleElements.length;
+  const selected = visibleElements.find((e) => e.id === selectedId) ?? null;
   const setElements = (next) => updateOutput({ elements: next });
   const updateEl = (id, patch) => setElements(elements.map((e) => (e.id === id ? { ...e, ...patch } : e)));
   const moveEl = (id, patch) => {
@@ -289,6 +299,7 @@ export default function EditorView() {
     if (el) moveEl(id, { x: el.x + (d.x ?? 0), y: el.y + (d.y ?? 0) });
   };
   const addEl = (kind, patch = {}) => {
+    // Nouvel élément : visible dans tous les états (il apparaît donc dans l'état en cours).
     const el = createElement(kind, patch, output);
     // Par défaut : centré, taille réduite si la sortie est plus petite.
     const width = Math.min(el.width, output.width);
@@ -376,7 +387,7 @@ export default function EditorView() {
           <ArrowLeftIcon className="w-4 h-4" />
         </button>
         <span className="font-semibold text-sm mr-2">Éditeur</span>
-        <div className="flex items-center gap-1 overflow-x-auto min-w-0">
+        <div className="flex items-center gap-1 overflow-x-auto flex-1 min-w-[160px]">
           {outputs.map((o) => (
             <button
               key={o.id}
@@ -397,7 +408,7 @@ export default function EditorView() {
           </button>
         </div>
 
-        <div className="ml-auto flex items-center gap-3 text-xs flex-shrink-0">
+        <div className="flex items-center gap-3 text-xs flex-shrink-0">
           <span className="opacity-60 hidden lg:inline">Aperçu</span>
           <div className="inline-flex rounded-lg border border-zinc-300 dark:border-zinc-700 overflow-hidden">
             {[["auto", "Réel"], ...OUTPUT_STATES.map((s) => [s.key, s.label])].map(([k, l]) => (
@@ -437,13 +448,19 @@ export default function EditorView() {
             {uploadError && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{uploadError}</p>}
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto p-3">
-            <div className="text-[11px] uppercase tracking-wide opacity-60 mb-2">Calques ({elements.length})</div>
+            <div className="text-[11px] uppercase tracking-wide opacity-60 mb-2">
+              Calques ({visibleElements.length})
+              {hiddenCount > 0 && <span className="normal-case tracking-normal"> · {hiddenCount} dans d'autres états</span>}
+            </div>
             {elements.length === 0 && <div className="text-xs opacity-60 italic px-1 py-2">Aucun élément. Ajoutez-en ci-dessus.</div>}
+            {elements.length > 0 && visibleElements.length === 0 && (
+              <div className="text-xs opacity-60 italic px-1 py-2">Aucun calque dans l'état « {OUTPUT_STATES.find((s) => s.key === ctx.outputState)?.label} ». Changez d'état en haut, ou ajoutez un élément.</div>
+            )}
             <div className="space-y-1">
-              {[...elements].reverse().map((el) => {
+              {[...visibleElements].reverse().map((el) => {
                 const Icon = KIND_ICON[el.kind];
                 const sel = el.id === selectedId;
-                const shown = isElementShown(el, ctx);
+                const shown = el.visible;
                 return (
                   <div
                     key={el.id}
