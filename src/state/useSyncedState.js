@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import LocalSocket from "../sync/LocalSocket";
 import { bus } from "../sync/SyncBus";
 import { normalizeState } from "./model";
+import { FONTS } from "./look";
+import { normalizeField } from "./bindings";
 
 const LS_KEY = "rodeo-scoring-state-v1";
 function loadState() { try { return JSON.parse(localStorage.getItem(LS_KEY)) || null; } catch { return null; } }
@@ -33,8 +35,26 @@ export const DEFAULT_BANNERS = [
 export const DEFAULT_CANVAS = {
   width: 1920,
   height: 1080,
-  banners: [], // user adds sub-banners via the editor; default empty
+  background: "black", // black | green | blue | transparent | #rrggbb
+  banners: [], // éléments (bandeaux, chrono, infographies) ajoutés dans l'éditeur
 };
+
+// Gabarit fourni par l'équipe broadcast : bordeaux, charbon, crème.
+export const LOWER_THIRD_DEFAULTS = {
+  style: { primary: "#3b0b10", panel: "#231a1e", light: "#f3ecdc", text: "#f3ecdc" },
+  fields: {
+    title: { source: "competitor.name", text: "" },
+    subtitle: { source: "competitor.hometown", text: "" },
+    box: { source: "timerOrResult", text: "" },
+    boxLabel: { source: "none", text: "" },
+  },
+  font: "timmons",
+  showLogo: true,
+  animate: true,
+};
+
+const HEX = /^#[0-9a-f]{6}$/i;
+const hex = (v, fallback) => (typeof v === "string" && HEX.test(v) ? v.toLowerCase() : fallback);
 
 const DEFAULT_STATE = {
   eventName: "Rodeo",
@@ -77,6 +97,19 @@ function normalizeCanvasBanner(src, canvasW, canvasH) {
     width: w,
     height: h,
   };
+  if (src?.kind === "lowerThird") {
+    const d = LOWER_THIRD_DEFAULTS;
+    return {
+      ...base,
+      kind: "lowerThird",
+      label: src?.label ?? "Infographie",
+      font: src?.font in FONTS ? src.font : d.font,
+      showLogo: src?.showLogo ?? d.showLogo,
+      animate: src?.animate ?? d.animate,
+      style: Object.fromEntries(Object.entries(d.style).map(([k, v]) => [k, hex(src?.style?.[k], v)])),
+      fields: Object.fromEntries(Object.entries(d.fields).map(([k, v]) => [k, normalizeField(src?.fields?.[k], v)])),
+    };
+  }
   if (src?.kind === "timer") {
     return {
       ...base,
@@ -105,7 +138,9 @@ function migrateCanvas(saved) {
   const banners = Array.isArray(src.banners)
     ? src.banners.map((b) => normalizeCanvasBanner(b, width, height))
     : [];
-  return { width, height, banners };
+  const bg = typeof src.background === "string" ? src.background : DEFAULT_CANVAS.background;
+  const background = ["black", "green", "blue", "transparent"].includes(bg) ? bg : hex(bg, "black");
+  return { width, height, background, banners };
 }
 
 function migrateBanners(saved) {

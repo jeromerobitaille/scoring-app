@@ -1,22 +1,16 @@
 import React, { useEffect } from "react";
 import useSyncedState from "../state/useSyncedState";
 import useFullscreenExit from "../hooks/useFullscreenExit";
-import BannerView from "../components/BannerView";
-import TimerDisplay from "../components/TimerDisplay";
-import { TIMER_FONT_KEY, cardStyle } from "../state/look";
-import { getActive } from "../state/model";
+import CanvasStage from "../components/outputs/CanvasStage";
+import { canvasBackgroundCss } from "../state/canvas";
 import { useOutputTimer, HOLD_TIME_MODE_MS, HOLD_SCORE_MODE_MS } from "../hooks/useLiveTimer";
 
-const FALLBACK_CANVAS = { width: 1920, height: 1080, banners: [] };
+const FALLBACK_CANVAS = { width: 1920, height: 1080, background: "black", banners: [] };
 
+/** Sortie « canevas » : une fenêtre, plusieurs éléments positionnés librement. */
 export default function CanvasView() {
   useFullscreenExit();
   const [state] = useSyncedState();
-  // Charger la police du chrono d'avance : le premier temps affiché ne doit
-  // pas apparaître avec une police de remplacement.
-  useEffect(() => {
-    document.fonts?.load("64px 'Timmons NY'").catch(() => {});
-  }, []);
   const timerFrame = useOutputTimer({
     enabled: state.timerArmed && state.showLiveTimer !== false,
     pendingRun: state.pendingRun,
@@ -24,86 +18,28 @@ export default function CanvasView() {
   });
   const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const canvas = state.canvas ?? FALLBACK_CANVAS;
-  const roster = getActive(state).competition.roster;
 
-  const wParam = params?.get("w") ? Number(params.get("w")) : canvas.width;
-  const hParam = params?.get("h") ? Number(params.get("h")) : canvas.height;
+  const width = Math.max(320, (params?.get("w") ? Number(params.get("w")) : canvas.width) || 0);
+  const height = Math.max(64, (params?.get("h") ? Number(params.get("h")) : canvas.height) || 0);
 
-  const width = Math.max(320, wParam || 0);
-  const height = Math.max(64, hParam || 0);
+  // Fond de page = fond du canevas (transparent pour une source navigateur OBS).
+  useEffect(() => {
+    document.body.style.background = canvasBackgroundCss(canvas.background);
+    document.documentElement.style.background = canvasBackgroundCss(canvas.background);
+    return () => {
+      document.body.style.background = "";
+      document.documentElement.style.background = "";
+    };
+  }, [canvas.background]);
+
+  useEffect(() => {
+    document.fonts?.load("64px 'Timmons NY'").catch(() => {});
+    document.fonts?.load("64px 'TexasTango'").catch(() => {});
+  }, []);
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        width,
-        height,
-        overflow: "hidden",
-        background: "#000",
-      }}
-    >
-      {canvas.banners.map((cb) => (
-        <div
-          key={cb.id}
-          style={{
-            position: "absolute",
-            left: cb.x,
-            top: cb.y,
-            width: cb.width,
-            height: cb.height,
-            overflow: "hidden",
-          }}
-        >
-          {cb.kind === "timer" ? (
-            // Élément « Chrono » : carte grise comme celles du bandeau, police
-            // Timmons NY. Noir tant qu'il n'y a rien à montrer (chrono désarmé,
-            // ou aucune course en cours / en attente).
-            <div style={{ width: "100%", height: "100%", background: "#000" }}>
-              {timerFrame && (
-                <div
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    boxSizing: "border-box",
-                    ...cardStyle(state.look, cb.height / 216),
-                  }}
-                >
-                  <TimerDisplay
-                    seconds={timerFrame.seconds}
-                    competitor={cb.showName ? state.currentCompetitor : null}
-                    width={cb.width}
-                    height={cb.height}
-                    align={cb.align}
-                    scale={cb.timeScale}
-                    font={TIMER_FONT_KEY[state.look.fonts.numbers]}
-                    color={state.look.colors.text}
-                    targetColor={state.look.colors.timerTarget}
-                    target={state.timerTarget}
-                  />
-                </div>
-              )}
-            </div>
-          ) : (
-            <BannerView
-              banner={cb}
-              entries={state.entries}
-              scoreMode={state.scoreMode}
-              eventName={state.eventName}
-              timerFrame={timerFrame}
-              competitor={state.bannerTimerShowName ? state.currentCompetitor : null}
-              timerTarget={state.timerTarget}
-              contextKey={`${state.currentRodeoId}:${state.currentDisciplineId}`}
-              look={state.look}
-              roster={roster}
-              width={cb.width}
-              height={cb.height}
-            />
-          )}
-        </div>
-      ))}
-
+    <>
+      <CanvasStage state={state} timerFrame={timerFrame} width={width} height={height} />
       {canvas.banners.length === 0 && (
         <div
           style={{
@@ -113,11 +49,12 @@ export default function CanvasView() {
             placeItems: "center",
             color: "rgba(255,255,255,0.4)",
             fontSize: Math.round(Math.min(width, height) * 0.025),
+            pointerEvents: "none",
           }}
         >
           Aucun élément dans le canevas — ajoutez-en depuis Paramètres → Canevas.
         </div>
       )}
-    </div>
+    </>
   );
 }
