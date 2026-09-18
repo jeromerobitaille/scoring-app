@@ -1,5 +1,5 @@
 import React from "react";
-import { TrashIcon, DocumentDuplicateIcon, ArrowUpTrayIcon } from "@heroicons/react/24/outline";
+import { TrashIcon, DocumentDuplicateIcon, ArrowUpTrayIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { FONTS } from "../../../state/look";
 import { VARIABLES } from "../../../state/bindings";
 import { ELEMENT_KINDS, OUTPUT_STATES } from "../../../state/outputs";
@@ -15,7 +15,7 @@ function TextProps({ el, set }) {
   return (
     <>
       <Section title="Texte">
-        <div className="flex gap-2">
+        <div className="space-y-1.5">
           <input
             className={INPUT}
             value={el.text}
@@ -24,7 +24,7 @@ function TextProps({ el, set }) {
             aria-label="Texte"
           />
           <select
-            className={`${INPUT} !w-48 flex-shrink-0`}
+            className={SMALL}
             value=""
             onChange={(e) => { if (e.target.value) set({ text: `${el.text}{${e.target.value}}` }); }}
             aria-label="Insérer une variable"
@@ -36,7 +36,7 @@ function TextProps({ el, set }) {
         <p className="text-[11px] opacity-60">Variables : {VARIABLES.map((v) => `{${v.key}}`).join(" ")}</p>
       </Section>
       <Section title="Police">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <SelectField label="Police" value={el.font} onChange={(v) => set({ font: v })} options={FONT_OPTIONS} className="col-span-2" />
           <NumberField label="Taille (px)" value={el.size} onChange={(v) => set({ size: v })} min={6} max={800} />
           <ColorSelect label="Couleur" value={el.color} onChange={(v) => set({ color: v })} />
@@ -53,7 +53,7 @@ function TextProps({ el, set }) {
         </div>
       </Section>
       <Section title="Fond du texte">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <ColorSelect label="Fond" value={el.background} onChange={(v) => set({ background: v })} allowNone />
           <NumberField label="Opacité du fond" value={el.bgOpacity} onChange={(v) => set({ bgOpacity: v })} min={0} max={1} step={0.05} />
           <NumberField label="Arrondi (px)" value={el.radius} onChange={(v) => set({ radius: v })} min={0} max={999} />
@@ -68,7 +68,7 @@ function ImageProps({ el, set, onPickImage, uploading }) {
   const isAsset = el.src.startsWith("asset:");
   return (
     <Section title="Image">
-      <div className="grid md:grid-cols-[200px_1fr] gap-3">
+      <div className="space-y-3">
         <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-2 bg-[repeating-conic-gradient(#8883_0%_25%,transparent_0%_50%)] bg-[length:16px_16px]">
           {el.src ? (
             <img src={isAsset ? ASSETS[el.src.slice(6)]?.url : el.src} alt="" className="w-full h-auto max-h-40 object-contain rounded-md" />
@@ -107,7 +107,7 @@ function ImageProps({ el, set, onPickImage, uploading }) {
 function CardProps({ el, set }) {
   return (
     <Section title="Carte">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <SelectField label="Remplissage" value={el.fill} onChange={(v) => set({ fill: v })} options={[["card", "Carte du thème"], ["background", "Dégradé de fond du thème"], ["custom", "Couleur libre"]]} />
         {el.fill === "custom" && (
           <>
@@ -139,7 +139,7 @@ function CardProps({ el, set }) {
 function TableProps({ el, set }) {
   return (
     <Section title="Tableau">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <Slider label="Rangées par page" value={el.pageSize} onChange={(v) => set({ pageSize: v })} min={1} max={12} step={1} />
         <Slider label="Rotation des pages" value={el.rotationMs} onChange={(v) => set({ rotationMs: v })} min={0} max={20000} step={1000} format={sec} />
         <Slider label="Taille du texte" value={el.fontScale} onChange={(v) => set({ fontScale: v })} min={0.5} max={2} step={0.05} format={(v) => `${v.toFixed(2)}×`} />
@@ -162,7 +162,7 @@ function TableProps({ el, set }) {
 function CarouselProps({ el, set }) {
   return (
     <Section title="Carrousel">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <Slider label="Cartes par page" value={el.pageSize} onChange={(v) => set({ pageSize: v })} min={1} max={8} step={1} />
         <Slider label="Rotation" value={el.rotationMs} onChange={(v) => set({ rotationMs: v })} min={1000} max={20000} step={1000} format={sec} />
         <Slider label="Taille du nom" value={el.nameScale} onChange={(v) => set({ nameScale: v })} min={0.6} max={2} step={0.05} format={(v) => `${v.toFixed(2)}×`} />
@@ -179,7 +179,7 @@ function CarouselProps({ el, set }) {
 function TimerProps({ el, set }) {
   return (
     <Section title="Chrono">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <Slider label="Taille du temps" value={el.timeScale} onChange={(v) => set({ timeScale: v })} min={0.3} max={2} step={0.05} format={(v) => `${v.toFixed(2)}×`} />
         <SelectField label="Alignement" value={el.align} onChange={(v) => set({ align: v })} options={ALIGN_OPTIONS} />
         <SelectField label="Fond" value={el.fill} onChange={(v) => set({ fill: v })} options={[["none", "Aucun"], ["card", "Carte du thème"], ["black", "Noir, bordure accent"]]} />
@@ -195,25 +195,30 @@ function TimerProps({ el, set }) {
 const KIND_PROPS = { text: TextProps, image: ImageProps, card: CardProps, table: TableProps, carousel: CarouselProps, timer: TimerProps };
 
 /** Panneau des propriétés de l'élément sélectionné. */
-export default function ElementProperties({ el, output, onChange, onMove, onDuplicate, onRemove, onPickImage, uploading }) {
+export default function ElementProperties({ el, output, onChange, onMove, onDuplicate, onRemove, onPickImage, uploading, onDeselect }) {
   const set = (patch) => onChange(el.id, patch);
   const Props = KIND_PROPS[el.kind];
   return (
-    <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 space-y-4">
-      <div className="flex items-center gap-3">
-        <input
-          type="text"
-          value={el.name}
-          onChange={(e) => set({ name: e.target.value })}
-          className="text-base font-semibold bg-transparent border-0 border-b border-transparent hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-zinc-500 focus:outline-none px-0 py-0.5 flex-1 min-w-0"
-          aria-label="Nom de l'élément"
-        />
-        <span className="text-xs opacity-60 flex-shrink-0">{ELEMENT_KINDS[el.kind].label}</span>
-        <button type="button" onClick={() => onDuplicate(el.id)} className={BTN}><DocumentDuplicateIcon className="w-3.5 h-3.5" /> Dupliquer</button>
-        <button type="button" onClick={() => onRemove(el.id)} className={BTN_DANGER}><TrashIcon className="w-3.5 h-3.5" /> Supprimer</button>
+    <div className="space-y-4">
+      <div>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={el.name}
+            onChange={(e) => set({ name: e.target.value })}
+            className="text-base font-semibold bg-transparent border-0 border-b border-transparent hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-zinc-500 focus:outline-none px-0 py-0.5 flex-1 min-w-0"
+            aria-label="Nom de l'élément"
+          />
+          {onDeselect && (
+            <button type="button" onClick={onDeselect} className="p-1 rounded-lg opacity-60 hover:opacity-100 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 cursor-pointer" title="Propriétés de la sortie" aria-label="Désélectionner">
+              <XMarkIcon className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+        <div className="text-xs opacity-60">{ELEMENT_KINDS[el.kind].label}</div>
       </div>
 
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <NumberField label="X" value={el.x} onChange={(v) => onMove(el.id, { x: v })} min={-output.width} max={output.width} />
         <NumberField label="Y" value={el.y} onChange={(v) => onMove(el.id, { y: v })} min={-output.height} max={output.height} />
         <NumberField label="Largeur" value={el.width} onChange={(v) => onMove(el.id, { width: v })} min={8} max={output.width} />
@@ -234,6 +239,11 @@ export default function ElementProperties({ el, output, onChange, onMove, onDupl
       </Section>
 
       {Props && <Props el={el} set={set} onPickImage={onPickImage} uploading={uploading} />}
+
+      <div className="flex gap-2 pt-3 border-t border-zinc-200 dark:border-zinc-800">
+        <button type="button" onClick={() => onDuplicate(el.id)} className={BTN}><DocumentDuplicateIcon className="w-3.5 h-3.5" /> Dupliquer</button>
+        <button type="button" onClick={() => onRemove(el.id)} className={BTN_DANGER}><TrashIcon className="w-3.5 h-3.5" /> Supprimer</button>
+      </div>
     </div>
   );
 }

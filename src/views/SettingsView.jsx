@@ -22,7 +22,7 @@ import RodeosTab from "./settings/RodeosTab";
 import DisciplinesTab from "./settings/DisciplinesTab";
 import BackupTab from "./settings/BackupTab";
 import LookTab from "./settings/LookTab";
-import EditorTab from "./settings/editor/EditorTab";
+import OutputsTab from "./settings/OutputsTab";
 
 function QrTab() {
   return <ShareConnection />;
@@ -184,7 +184,7 @@ function TimerTab({ state, push }) {
 const TABS = [
   { id: "rodeos",      label: "Rodéos",      icon: UserGroupIcon },
   { id: "disciplines", label: "Disciplines", icon: AdjustmentsHorizontalIcon },
-  { id: "editor", label: "Éditeur", icon: Squares2X2Icon },
+  { id: "outputs", label: "Sorties", icon: Squares2X2Icon },
   { id: "look",   label: "Apparence", icon: PaintBrushIcon },
   { id: "qr",     label: "QR codes", icon: QrCodeIcon },
   { id: "timer",  label: "Chrono",   icon: ClockIcon },
@@ -195,7 +195,7 @@ export default function SettingsView() {
   const [state, push] = useSyncedState();
   const [active, setActive] = useState(() => {
     const tab = new URLSearchParams(window.location.search).get("tab");
-    const legacy = { banner: "editor", canvas: "editor", table: "editor" };
+    const legacy = { banner: "outputs", canvas: "outputs", table: "outputs", editor: "outputs" };
     return TABS.some((t) => t.id === tab) ? tab : legacy[tab] ?? "rodeos";
   });
 
@@ -243,7 +243,7 @@ export default function SettingsView() {
 
         {active === "rodeos"      && <RodeosTab state={state} push={push} />}
         {active === "disciplines" && <DisciplinesTab state={state} push={push} />}
-        {active === "editor" && <EditorTab state={state} push={push} />}
+        {active === "outputs" && <OutputsTab state={state} />}
         {active === "look"   && <LookTab state={state} push={push} />}
         {active === "qr"     && <QrTab />}
         {active === "timer"  && <TimerTab state={state} push={push} />}
