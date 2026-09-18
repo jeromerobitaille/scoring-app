@@ -1,14 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { CheckCircleIcon, PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
 import Card from "../../components/ui/Card";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
-import {
-  getCompetition,
-  newId,
-  rosterFromText,
-  rosterToText,
-  updateCompetition,
-} from "../../state/model";
+import { newId } from "../../state/model";
+import RosterTable from "./RosterTable";
 
 const INPUT =
   "w-full min-w-0 rounded-xl border px-3 py-2 text-sm outline-none bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700";
@@ -136,75 +131,6 @@ function RodeoList({ state, push, selectedId, onSelect }) {
   );
 }
 
-function RosterEditor({ state, push, rodeoId, disciplineId }) {
-  const competition = getCompetition(state, rodeoId, disciplineId);
-  const saved = rosterToText(competition.roster);
-  const [text, setText] = useState(saved);
-  const [dirty, setDirty] = useState(false);
-
-  // Suivre les modifications faites ailleurs (autre poste, ajout rapide) tant
-  // qu'on n'est pas en train d'éditer. Le parent remonte ce composant (key)
-  // quand on change de compétition.
-  useEffect(() => {
-    if (!dirty) setText(saved);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [saved]);
-
-  const preview = rosterFromText(text, competition.roster);
-  const keptIds = new Set(preview.map((p) => p.id));
-  const orphaned = competition.entries.filter(
-    (e) => e.competitorId && competition.roster.some((p) => p.id === e.competitorId) && !keptIds.has(e.competitorId)
-  );
-
-  function save() {
-    push(updateCompetition(state, rodeoId, disciplineId, (comp) => ({
-      ...comp,
-      roster: rosterFromText(text, comp.roster),
-    })));
-    setDirty(false);
-  }
-
-  return (
-    <div className="flex flex-col h-full">
-      <textarea
-        value={text}
-        onChange={(e) => { setText(e.target.value); setDirty(true); }}
-        onBlur={() => { if (dirty) save(); }}
-        rows={16}
-        spellCheck={false}
-        placeholder={"Un compétiteur par ligne, dans l'ordre de passage :\nNom | Ville | Animal | Entrepreneur\n\nSeul le nom est obligatoire. On peut coller des colonnes depuis Excel."}
-        aria-label="Liste des compétiteurs"
-        className="flex-1 w-full rounded-xl border px-3 py-2 text-sm font-mono leading-6 outline-none bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 resize-y"
-      />
-      <p className="mt-1 text-[11px] opacity-60">
-        Format : <span className="font-mono">Nom | Ville | Animal | Entrepreneur</span> — la ville et
-        l'animal s'affichent sur le tableau et les bandeaux (voir Apparence).
-      </p>
-      <div className="mt-2 flex items-center justify-between gap-3 text-xs">
-        <span className="opacity-70">
-          {preview.length} compétiteur{preview.length > 1 ? "s" : ""}
-          {competition.entries.length > 0 && ` · ${competition.entries.length} résultat(s)`}
-          {dirty ? " · modifications non enregistrées" : ""}
-        </span>
-        <button
-          type="button"
-          onClick={save}
-          disabled={!dirty}
-          className="rounded-xl px-3 py-1.5 font-semibold bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 disabled:opacity-30 cursor-pointer"
-        >
-          Enregistrer
-        </button>
-      </div>
-      {orphaned.length > 0 && (
-        <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
-          {orphaned.map((e) => e.name).join(", ")} {orphaned.length > 1 ? "ont" : "a"} déjà un résultat :
-          le résultat restera dans le classement même si le nom est retiré de la liste.
-        </p>
-      )}
-    </div>
-  );
-}
-
 export default function RodeosTab({ state, push }) {
   const [rodeoId, setRodeoId] = useState(state.currentRodeoId);
   const [disciplineId, setDisciplineId] = useState(state.currentDisciplineId);
@@ -223,13 +149,13 @@ export default function RodeosTab({ state, push }) {
       </div>
 
       <div className="grid lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-4">
+        <div className="lg:col-span-3">
           <h3 className="text-sm font-semibold mb-2">Rodéos</h3>
           <RodeoList state={state} push={push} selectedId={rodeo.id} onSelect={setRodeoId} />
         </div>
 
-        <div className="lg:col-span-8 grid md:grid-cols-5 gap-4">
-          <div className="md:col-span-2">
+        <div className="lg:col-span-9 grid md:grid-cols-4 gap-4">
+          <div className="md:col-span-1">
             <h3 className="text-sm font-semibold mb-2">Disciplines — {rodeo.name}</h3>
             <ul className="space-y-1">
               {state.disciplines.map((d) => {
@@ -260,7 +186,7 @@ export default function RodeosTab({ state, push }) {
           </div>
           <div className="md:col-span-3 flex flex-col">
             <h3 className="text-sm font-semibold mb-2 truncate">Ordre de passage — {discipline.name}</h3>
-            <RosterEditor
+            <RosterTable
               key={`${rodeo.id}:${discipline.id}`}
               state={state}
               push={push}
