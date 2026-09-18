@@ -25,6 +25,16 @@ export const BINDINGS = [
 
 export const BINDING_KEYS = new Set(BINDINGS.map((b) => b.key));
 
+/** Variables utilisables dans un texte : {competitor.name}, {timer}, … */
+export const VARIABLES = BINDINGS.filter((b) => b.key !== "none" && b.key !== "text");
+
+/** Remplace chaque {variable} d'un texte par sa valeur courante. */
+export function resolveTemplate(text, ctx) {
+  return String(text ?? "").replace(/\{([a-zA-Z.]+)\}/g, (m, key) =>
+    BINDING_KEYS.has(key) ? resolveField({ source: key, text: "" }, ctx) : m
+  );
+}
+
 const ordinal = (n) => (n === 1 ? "1er" : `${n}e`);
 
 /**

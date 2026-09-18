@@ -3,7 +3,6 @@ import LocalSocket from "../sync/LocalSocket";
 import { bus } from "../sync/SyncBus";
 import { normalizeState } from "./model";
 import { FONTS } from "./look";
-import { normalizeField } from "./bindings";
 
 const LS_KEY = "rodeo-scoring-state-v1";
 function loadState() { try { return JSON.parse(localStorage.getItem(LS_KEY)) || null; } catch { return null; } }
@@ -39,18 +38,21 @@ export const DEFAULT_CANVAS = {
   banners: [], // éléments (bandeaux, chrono, infographies) ajoutés dans l'éditeur
 };
 
-// Gabarit fourni par l'équipe broadcast : bordeaux, charbon, crème.
-export const LOWER_THIRD_DEFAULTS = {
-  style: { primary: "#3b0b10", panel: "#231a1e", light: "#f3ecdc", text: "#f3ecdc" },
-  fields: {
-    title: { source: "competitor.name", text: "" },
-    subtitle: { source: "competitor.hometown", text: "" },
-    box: { source: "timerOrResult", text: "" },
-    boxLabel: { source: "none", text: "" },
-  },
+export const GRAPHIC_LAYER_DEFAULTS = {
+  text: "{competitor.name}",
+  x: 40,
+  y: 40,
+  width: 600,
+  height: 80,
   font: "timmons",
-  showLogo: true,
-  animate: true,
+  size: 56,
+  color: "#ffffff",
+  align: "left",
+  valign: "middle",
+  bold: false,
+  uppercase: false,
+  shadow: false,
+  letterSpacing: 0,
 };
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -87,6 +89,35 @@ function normalizeBanner(src, fallback) {
 
 const TIMER_ALIGNS = ["left", "center", "right"];
 
+const LAYER_ALIGNS = ["left", "center", "right"];
+const LAYER_VALIGNS = ["top", "middle", "bottom"];
+
+function normalizeGraphicLayer(src) {
+  if (!src || typeof src !== "object") return null;
+  const d = GRAPHIC_LAYER_DEFAULTS;
+  const num = (v, fb, min, max) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fb;
+  };
+  return {
+    id: src.id ?? `l-${Math.random().toString(36).slice(2, 8)}`,
+    text: String(src.text ?? d.text).slice(0, 200),
+    x: num(src.x, d.x, -4000, 8000),
+    y: num(src.y, d.y, -4000, 8000),
+    width: num(src.width, d.width, 8, 8000),
+    height: num(src.height, d.height, 8, 4000),
+    font: src.font in FONTS ? src.font : d.font,
+    size: num(src.size, d.size, 6, 600),
+    color: hex(src.color, d.color),
+    align: LAYER_ALIGNS.includes(src.align) ? src.align : d.align,
+    valign: LAYER_VALIGNS.includes(src.valign) ? src.valign : d.valign,
+    bold: Boolean(src.bold),
+    uppercase: Boolean(src.uppercase),
+    shadow: Boolean(src.shadow),
+    letterSpacing: num(src.letterSpacing, 0, -0.1, 1),
+  };
+}
+
 function normalizeCanvasBanner(src, canvasW, canvasH) {
   const w = Math.max(64, Math.min(canvasW, Number(src?.width) || 1920));
   const h = Math.max(32, Math.min(canvasH, Number(src?.height) || 216));
@@ -97,17 +128,19 @@ function normalizeCanvasBanner(src, canvasW, canvasH) {
     width: w,
     height: h,
   };
-  if (src?.kind === "lowerThird") {
-    const d = LOWER_THIRD_DEFAULTS;
+  if (src?.kind === "graphic") {
+    const layers = Array.isArray(src.layers) ? src.layers.map(normalizeGraphicLayer).filter(Boolean) : [];
+    const tol = Number(src.keyTolerance);
     return {
       ...base,
-      kind: "lowerThird",
+      kind: "graphic",
       label: src?.label ?? "Infographie",
-      font: src?.font in FONTS ? src.font : d.font,
-      showLogo: src?.showLogo ?? d.showLogo,
-      animate: src?.animate ?? d.animate,
-      style: Object.fromEntries(Object.entries(d.style).map(([k, v]) => [k, hex(src?.style?.[k], v)])),
-      fields: Object.fromEntries(Object.entries(d.fields).map(([k, v]) => [k, normalizeField(src?.fields?.[k], v)])),
+      image: typeof src.image === "string" ? src.image.slice(0, 2000) : "",
+      keyColor: hex(src.keyColor, null),
+      keyTolerance: Number.isFinite(tol) ? Math.min(0.8, Math.max(0.05, tol)) : 0.35,
+      hideWhenEmpty: src.hideWhenEmpty ?? true,
+      animate: src.animate ?? true,
+      layers,
     };
   }
   if (src?.kind === "timer") {
@@ -136,7 +169,7 @@ function migrateCanvas(saved) {
   const width = Math.max(320, Number(src.width) || DEFAULT_CANVAS.width);
   const height = Math.max(64, Number(src.height) || DEFAULT_CANVAS.height);
   const banners = Array.isArray(src.banners)
-    ? src.banners.map((b) => normalizeCanvasBanner(b, width, height))
+    ? src.banners.filter((b) => b?.kind !== "lowerThird").map((b) => normalizeCanvasBanner(b, width, height))
     : [];
   const bg = typeof src.background === "string" ? src.background : DEFAULT_CANVAS.background;
   const background = ["black", "green", "blue", "transparent"].includes(bg) ? bg : hex(bg, "black");

@@ -27,7 +27,12 @@ async function startServer() {
   const staticDir = resolveStaticDir();
   store = createStore(app.getPath("userData"));
   try {
-    serverInfo = await createServer({ staticDir, port: DEFAULT_PORT, store });
+    serverInfo = await createServer({
+      staticDir,
+      port: DEFAULT_PORT,
+      store,
+      mediaDir: path.join(app.getPath("userData"), "media"),
+    });
     console.log(`[fwst-scoring] HTTP+WS listening on :${serverInfo.port}`);
   } catch (err) {
     console.error("[fwst-scoring] Failed to start server:", err);

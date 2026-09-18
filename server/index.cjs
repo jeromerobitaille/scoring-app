@@ -45,9 +45,50 @@ function serveFile(res, filePath) {
   });
 }
 
-function createServer({ staticDir, port = 5050, hubPath = "/live-score", store = null }) {
+const MEDIA_TYPES = { "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif" };
+const MEDIA_MAX_BYTES = 25 * 1024 * 1024;
+
+/** Reçoit une image (corps brut, Content-Type image/*) et l'enregistre dans mediaDir. */
+function receiveMedia(req, res, mediaDir) {
+  const type = String(req.headers["content-type"] || "").split(";")[0].trim();
+  const ext = MEDIA_TYPES[type];
+  if (!ext) { res.statusCode = 415; return res.end("Type d'image non pris en charge"); }
+  const chunks = [];
+  let size = 0;
+  req.on("data", (c) => {
+    size += c.length;
+    if (size > MEDIA_MAX_BYTES) { res.statusCode = 413; res.end("Image trop volumineuse (25 Mo max)"); req.destroy(); return; }
+    chunks.push(c);
+  });
+  req.on("end", () => {
+    if (res.writableEnded) return;
+    try {
+      fs.mkdirSync(mediaDir, { recursive: true });
+      const name = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}${ext}`;
+      fs.writeFileSync(path.join(mediaDir, name), Buffer.concat(chunks));
+      res.setHeader("Content-Type", "application/json; charset=utf-8");
+      res.end(JSON.stringify({ url: `/media/${name}`, size }));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(err.message);
+    }
+  });
+}
+
+function createServer({ staticDir, port = 5050, hubPath = "/live-score", store = null, mediaDir = null }) {
   const server = http.createServer((req, res) => {
     if (!req.url) { res.statusCode = 400; return res.end(); }
+
+    // Images téléversées (infographies du canevas) : partagées par tous les écrans.
+    if (mediaDir && req.url === "/api/media" && req.method === "POST") {
+      return receiveMedia(req, res, mediaDir);
+    }
+    if (mediaDir && req.url.startsWith("/media/")) {
+      const filePath = safeJoin(mediaDir, req.url.slice("/media".length));
+      if (!filePath) { res.statusCode = 400; return res.end("Bad request"); }
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      return serveFile(res, filePath);
+    }
 
     if (req.url === "/api/server-info") {
       const addr = server.address();

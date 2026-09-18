@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import BannerView from "../BannerView";
 import TimerDisplay from "../TimerDisplay";
-import LowerThird from "./LowerThird";
+import GraphicElement from "./GraphicElement";
 import { TIMER_FONT_KEY, cardStyle } from "../../state/look";
 import { getActive } from "../../state/model";
 import { bindingContext, canvasBackgroundCss } from "../../state/canvas";
@@ -31,7 +31,7 @@ export default function CanvasStage({ state, timerFrame, width, height, backgrou
       {canvas.banners.map((el) => (
         <div
           key={el.id}
-          style={{ position: "absolute", left: el.x, top: el.y, width: el.width, height: el.height, overflow: el.kind === "lowerThird" ? "visible" : "hidden" }}
+          style={{ position: "absolute", left: el.x, top: el.y, width: el.width, height: el.height, overflow: "hidden" }}
         >
           {el.kind === "timer" ? (
             // Élément « Chrono » : noir tant qu'il n'y a rien à montrer.
@@ -53,8 +53,8 @@ export default function CanvasStage({ state, timerFrame, width, height, backgrou
                 </div>
               )}
             </div>
-          ) : el.kind === "lowerThird" ? (
-            <LowerThird element={el} ctx={ctx} />
+          ) : el.kind === "graphic" ? (
+            <GraphicElement element={el} ctx={ctx} />
           ) : (
             <BannerView
               banner={el}

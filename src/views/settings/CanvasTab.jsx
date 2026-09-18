@@ -1,5 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
-import { PlusIcon, TrashIcon, ClockIcon, TvIcon, RectangleStackIcon, DocumentDuplicateIcon } from "@heroicons/react/24/outline";
+import {
+  TrashIcon,
+  ClockIcon,
+  TvIcon,
+  PhotoIcon,
+  DocumentDuplicateIcon,
+  PlusIcon,
+  ArrowUpTrayIcon,
+} from "@heroicons/react/24/outline";
 import Card from "../../components/ui/Card";
 import Label from "../../components/ui/Label";
 import TextInput from "../../components/ui/TextInput";
@@ -8,21 +16,28 @@ import CanvasStage from "../../components/outputs/CanvasStage";
 import { CANVAS_BACKGROUNDS } from "../../state/canvas";
 import { bus } from "../../sync/SyncBus";
 import { FONTS } from "../../state/look";
-import { BINDINGS } from "../../state/bindings";
-import { LOWER_THIRD_DEFAULTS } from "../../state/useSyncedState";
+import { VARIABLES } from "../../state/bindings";
+import { GRAPHIC_LAYER_DEFAULTS } from "../../state/useSyncedState";
+import { uploadImage } from "../../state/media";
 
 const INPUT =
   "w-full min-w-0 rounded-xl border px-3 py-2 text-sm outline-none bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700";
-const newId = () => `c-${Math.random().toString(36).slice(2, 8)}`;
+const SMALL =
+  "w-full min-w-0 rounded-lg border px-2 py-1 text-xs outline-none bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700";
+const newId = (prefix) => `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
 
 // Chrono d'exemple pour l'aperçu quand aucun vrai chrono ne tourne.
 const PREVIEW_TIMER = { seconds: 6.42, state: "running", runId: 0, session: "preview" };
 
-const KIND_ICON = { banner: TvIcon, timer: ClockIcon, lowerThird: RectangleStackIcon };
-const KIND_LABEL = { banner: "Bandeau", timer: "Chrono", lowerThird: "Infographie" };
+const KIND_ICON = { banner: TvIcon, timer: ClockIcon, graphic: PhotoIcon };
+const KIND_LABEL = { banner: "Bandeau", timer: "Chrono", graphic: "Infographie" };
 
-/** Aperçu réel du canevas, à l'échelle, avec déplacement et redimensionnement à la souris. */
-function CanvasEditor({ state, canvas, selectedId, onSelect, onMove, showSampleTimer }) {
+/**
+ * Aperçu réel du canevas, à l'échelle. Les éléments (et les calques de
+ * l'infographie sélectionnée) se déplacent à la souris ; le coin bas-droit
+ * redimensionne.
+ */
+function CanvasEditor({ state, canvas, selectedId, selectedLayerId, onSelect, onSelectLayer, onMove, onMoveLayer, showSampleTimer }) {
   const wrapRef = useRef(null);
   const [wrapW, setWrapW] = useState(720);
   useEffect(() => {
@@ -32,24 +47,22 @@ function CanvasEditor({ state, canvas, selectedId, onSelect, onMove, showSampleT
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const scale = Math.min(wrapW / canvas.width, 420 / canvas.height);
+  const scale = Math.min(wrapW / canvas.width, 460 / canvas.height);
   const previewW = Math.round(canvas.width * scale);
   const previewH = Math.round(canvas.height * scale);
 
-  // Glisser : déplacement (poignée = tout l'élément) ou redimensionnement (coin bas-droit).
   const dragRef = useRef(null);
-  function startDrag(e, el, mode) {
+  function startDrag(e, target, mode, apply) {
     e.preventDefault();
     e.stopPropagation();
-    onSelect(el.id);
-    dragRef.current = { id: el.id, mode, startX: e.clientX, startY: e.clientY, x: el.x, y: el.y, w: el.width, h: el.height };
+    dragRef.current = { mode, startX: e.clientX, startY: e.clientY, x: target.x, y: target.y, w: target.width, h: target.height };
     const move = (ev) => {
       const d = dragRef.current;
       if (!d) return;
       const dx = (ev.clientX - d.startX) / scale;
       const dy = (ev.clientY - d.startY) / scale;
-      if (d.mode === "move") onMove(d.id, { x: Math.round(d.x + dx), y: Math.round(d.y + dy) });
-      else onMove(d.id, { width: Math.round(d.w + dx), height: Math.round(d.h + dy) });
+      if (d.mode === "move") apply({ x: Math.round(d.x + dx), y: Math.round(d.y + dy) });
+      else apply({ width: Math.round(d.w + dx), height: Math.round(d.h + dy) });
     };
     const up = () => {
       dragRef.current = null;
@@ -59,6 +72,9 @@ function CanvasEditor({ state, canvas, selectedId, onSelect, onMove, showSampleT
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
   }
+
+  const selectedEl = canvas.banners.find((b) => b.id === selectedId);
+  const layers = selectedEl?.kind === "graphic" ? selectedEl.layers : [];
 
   return (
     <div ref={wrapRef} className="w-full">
@@ -73,18 +89,19 @@ function CanvasEditor({ state, canvas, selectedId, onSelect, onMove, showSampleT
           backgroundSize: "16px 16px",
           backgroundPosition: "0 0,0 8px,8px -8px,-8px 0",
         }}
-        onMouseDown={() => onSelect(null)}
+        onMouseDown={() => { onSelect(null); onSelectLayer(null); }}
       >
         <div style={{ width: canvas.width, height: canvas.height, transform: `scale(${scale})`, transformOrigin: "top left", position: "absolute", top: 0, left: 0, pointerEvents: "none" }}>
           <CanvasStage state={state} timerFrame={showSampleTimer ? PREVIEW_TIMER : null} width={canvas.width} height={canvas.height} />
         </div>
-        {/* Calque d'édition */}
+
+        {/* Calque d'édition : éléments */}
         {canvas.banners.map((el) => {
           const sel = el.id === selectedId;
           return (
             <div
               key={el.id}
-              onMouseDown={(e) => startDrag(e, el, "move")}
+              onMouseDown={(e) => { onSelect(el.id); onSelectLayer(null); startDrag(e, el, "move", (p) => onMove(el.id, p)); }}
               title={`${el.label} — ${el.width}×${el.height} @ (${el.x},${el.y})`}
               className={sel ? "ring-2 ring-amber-400" : "ring-1 ring-white/40 hover:ring-white/80"}
               style={{
@@ -100,7 +117,7 @@ function CanvasEditor({ state, canvas, selectedId, onSelect, onMove, showSampleT
               <span className="absolute -top-4 left-0 text-[10px] font-mono px-1 rounded bg-black/70 text-white whitespace-nowrap">{el.label}</span>
               {sel && (
                 <span
-                  onMouseDown={(e) => startDrag(e, el, "resize")}
+                  onMouseDown={(e) => startDrag(e, el, "resize", (p) => onMove(el.id, p))}
                   className="absolute -right-1.5 -bottom-1.5 w-3 h-3 rounded-sm bg-amber-400 border border-black/40"
                   style={{ cursor: "nwse-resize" }}
                 />
@@ -108,6 +125,38 @@ function CanvasEditor({ state, canvas, selectedId, onSelect, onMove, showSampleT
             </div>
           );
         })}
+
+        {/* Calque d'édition : calques de texte de l'infographie sélectionnée */}
+        {selectedEl &&
+          layers.map((l) => {
+            const sel = l.id === selectedLayerId;
+            return (
+              <div
+                key={l.id}
+                onMouseDown={(e) => { onSelectLayer(l.id); startDrag(e, l, "move", (p) => onMoveLayer(selectedEl.id, l.id, p)); }}
+                title={l.text}
+                className={sel ? "ring-2 ring-sky-400" : "ring-1 ring-sky-300/60 hover:ring-sky-300"}
+                style={{
+                  position: "absolute",
+                  left: Math.round((selectedEl.x + l.x) * scale),
+                  top: Math.round((selectedEl.y + l.y) * scale),
+                  width: Math.max(4, Math.round(l.width * scale)),
+                  height: Math.max(4, Math.round(l.height * scale)),
+                  cursor: "move",
+                  boxSizing: "border-box",
+                  zIndex: 5,
+                }}
+              >
+                {sel && (
+                  <span
+                    onMouseDown={(e) => startDrag(e, l, "resize", (p) => onMoveLayer(selectedEl.id, l.id, p))}
+                    className="absolute -right-1.5 -bottom-1.5 w-3 h-3 rounded-sm bg-sky-400 border border-black/40"
+                    style={{ cursor: "nwse-resize" }}
+                  />
+                )}
+              </div>
+            );
+          })}
       </div>
     </div>
   );
@@ -123,23 +172,95 @@ function ColorRow({ label, value, onChange }) {
   );
 }
 
-function FieldEditor({ label, field, onChange }) {
-  const custom = field.source === "text";
-  const templated = !custom && field.source !== "none";
+/** Réglages d'un calque de texte. */
+function LayerEditor({ layer, onChange, onRemove, onDuplicate }) {
+  const num = (key, label, min, max, step = 1) => (
+    <label className="block">
+      <span className="text-[11px] opacity-60">{label}</span>
+      <input
+        type="number"
+        className={SMALL}
+        value={layer[key]}
+        min={min}
+        max={max}
+        step={step}
+        onChange={(e) => onChange({ [key]: Number(e.target.value) })}
+      />
+    </label>
+  );
+  const toggle = (key, label) => (
+    <label className="flex items-center gap-1.5 select-none cursor-pointer text-xs">
+      <input type="checkbox" checked={!!layer[key]} onChange={(e) => onChange({ [key]: e.target.checked })} className="w-3.5 h-3.5" />
+      {label}
+    </label>
+  );
   return (
-    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-2.5 space-y-1.5">
-      <div className="text-xs font-semibold">{label}</div>
-      <select className={INPUT} value={field.source} onChange={(e) => onChange({ ...field, source: e.target.value })}>
-        {BINDINGS.map((b) => <option key={b.key} value={b.key}>{b.label}</option>)}
-      </select>
-      {(custom || templated) && (
+    <div className="rounded-xl border border-sky-300/60 dark:border-sky-800 p-3 space-y-2 bg-sky-50/40 dark:bg-sky-950/20">
+      <div className="flex items-center gap-2">
         <input
           className={INPUT}
-          placeholder={custom ? "Texte à afficher" : "Habillage facultatif, ex. « {value} s »"}
-          value={field.text}
-          onChange={(e) => onChange({ ...field, text: e.target.value })}
+          value={layer.text}
+          onChange={(e) => onChange({ text: e.target.value })}
+          placeholder="Texte avec variables, ex. {competitor.name}"
+          aria-label="Texte du calque"
         />
-      )}
+        <select
+          className={`${INPUT} !w-44`}
+          value=""
+          onChange={(e) => { if (e.target.value) onChange({ text: `${layer.text}{${e.target.value}}` }); }}
+          aria-label="Insérer une variable"
+        >
+          <option value="">+ variable…</option>
+          {VARIABLES.map((v) => <option key={v.key} value={v.key}>{v.label}</option>)}
+        </select>
+      </div>
+      <div className="grid grid-cols-4 gap-1.5">
+        {num("x", "X", -4000, 8000)}
+        {num("y", "Y", -4000, 8000)}
+        {num("width", "Largeur", 8, 8000)}
+        {num("height", "Hauteur", 8, 4000)}
+      </div>
+      <div className="grid grid-cols-4 gap-1.5 items-end">
+        <label className="block col-span-2">
+          <span className="text-[11px] opacity-60">Police</span>
+          <select className={SMALL} value={layer.font} onChange={(e) => onChange({ font: e.target.value })}>
+            {Object.entries(FONTS).map(([k, f]) => <option key={k} value={k}>{f.label}</option>)}
+          </select>
+        </label>
+        {num("size", "Taille (px)", 6, 600)}
+        <label className="block">
+          <span className="text-[11px] opacity-60">Couleur</span>
+          <input type="color" value={layer.color} onChange={(e) => onChange({ color: e.target.value })} className="block w-full h-7 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent cursor-pointer" />
+        </label>
+      </div>
+      <div className="grid grid-cols-4 gap-1.5 items-end">
+        <label className="block">
+          <span className="text-[11px] opacity-60">Horizontal</span>
+          <select className={SMALL} value={layer.align} onChange={(e) => onChange({ align: e.target.value })}>
+            <option value="left">Gauche</option><option value="center">Centré</option><option value="right">Droite</option>
+          </select>
+        </label>
+        <label className="block">
+          <span className="text-[11px] opacity-60">Vertical</span>
+          <select className={SMALL} value={layer.valign} onChange={(e) => onChange({ valign: e.target.value })}>
+            <option value="top">Haut</option><option value="middle">Milieu</option><option value="bottom">Bas</option>
+          </select>
+        </label>
+        {num("letterSpacing", "Interlettrage (em)", -0.1, 1, 0.01)}
+        <div className="flex flex-col gap-1 pb-1">
+          {toggle("bold", "Gras")}
+          {toggle("uppercase", "Majuscules")}
+          {toggle("shadow", "Ombre")}
+        </div>
+      </div>
+      <div className="flex justify-end gap-2 pt-1">
+        <button type="button" onClick={onDuplicate} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer">
+          <DocumentDuplicateIcon className="w-3.5 h-3.5" /> Dupliquer
+        </button>
+        <button type="button" onClick={onRemove} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg border border-red-300 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer">
+          <TrashIcon className="w-3.5 h-3.5" /> Retirer
+        </button>
+      </div>
     </div>
   );
 }
@@ -147,16 +268,23 @@ function FieldEditor({ label, field, onChange }) {
 export default function CanvasTab({ state, push }) {
   const canvas = state.canvas;
   const [selectedId, setSelectedId] = useState(canvas.banners[0]?.id ?? null);
+  const [selectedLayerId, setSelectedLayerId] = useState(null);
   const [sampleTimer, setSampleTimer] = useState(true);
+  const [uploadError, setUploadError] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef(null);
+  const fileTargetRef = useRef(null); // id de l'élément dont on remplace l'image, ou null = nouveau
   const selected = canvas.banners.find((b) => b.id === selectedId);
 
   const updateCanvas = (patch) => push({ ...state, canvas: { ...canvas, ...patch } });
   const updateEl = (id, patch) =>
     updateCanvas({ banners: canvas.banners.map((b) => (b.id === id ? { ...b, ...patch } : b)) });
   const addEl = (el) => {
-    const id = newId();
+    const id = newId("c");
     updateCanvas({ banners: [...canvas.banners, { id, ...el }] });
     setSelectedId(id);
+    setSelectedLayerId(null);
+    return id;
   };
   const addBanner = () =>
     addEl({ kind: "banner", label: `Bandeau ${canvas.banners.length + 1}`, x: 0, y: 0, width: Math.min(1920, canvas.width), height: Math.min(216, canvas.height), pageSize: 3, nameScale: 1, scoreScale: 1, showLogo: true });
@@ -164,11 +292,47 @@ export default function CanvasTab({ state, push }) {
     const width = Math.min(640, canvas.width);
     addEl({ kind: "timer", label: "Chrono", x: Math.max(0, canvas.width - width), y: 0, width, height: Math.min(160, canvas.height), showName: false, align: "center", timeScale: 1 });
   };
-  const addLowerThird = () => {
-    const width = Math.min(1760, canvas.width - 160);
-    const height = Math.min(250, canvas.height);
-    addEl({ kind: "lowerThird", label: "Infographie", x: Math.round((canvas.width - width) / 2), y: Math.max(0, canvas.height - height - 40), width, height, ...LOWER_THIRD_DEFAULTS });
+  const pickImage = (targetId) => {
+    fileTargetRef.current = targetId;
+    fileRef.current?.click();
   };
+  async function onFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploadError(null);
+    setUploading(true);
+    try {
+      const { url, width: iw, height: ih } = await uploadImage(file);
+      const targetId = fileTargetRef.current;
+      if (targetId) {
+        updateEl(targetId, { image: url });
+      } else {
+        // Nouvel élément : taille de l'image, réduite si elle dépasse le canevas.
+        const fit = Math.min(1, canvas.width / (iw || canvas.width), canvas.height / (ih || canvas.height));
+        const width = Math.round((iw || canvas.width) * fit);
+        const height = Math.round((ih || Math.round(canvas.height / 4)) * fit);
+        addEl({
+          kind: "graphic",
+          label: `Infographie ${canvas.banners.filter((b) => b.kind === "graphic").length + 1}`,
+          x: Math.round((canvas.width - width) / 2),
+          y: canvas.height - height,
+          width,
+          height,
+          image: url,
+          keyColor: null,
+          keyTolerance: 0.35,
+          hideWhenEmpty: true,
+          animate: true,
+          layers: [{ ...GRAPHIC_LAYER_DEFAULTS, id: newId("l"), x: Math.round(width * 0.2), y: Math.round(height * 0.35), width: Math.round(width * 0.4), height: Math.round(height * 0.3), size: Math.round(height * 0.22) }],
+        });
+      }
+    } catch (err) {
+      setUploadError(err.message);
+    } finally {
+      setUploading(false);
+    }
+  }
   const duplicate = (el) => {
     const { id, ...rest } = el;
     void id;
@@ -177,7 +341,7 @@ export default function CanvasTab({ state, push }) {
   const removeEl = (id) => {
     const next = canvas.banners.filter((b) => b.id !== id);
     updateCanvas({ banners: next });
-    if (selectedId === id) setSelectedId(next[0]?.id ?? null);
+    if (selectedId === id) { setSelectedId(next[0]?.id ?? null); setSelectedLayerId(null); }
   };
   const moveEl = (id, patch) => {
     const el = canvas.banners.find((b) => b.id === id);
@@ -190,6 +354,38 @@ export default function CanvasTab({ state, push }) {
       x: Math.max(0, Math.min(canvas.width - width, patch.x ?? el.x)),
       y: Math.max(0, Math.min(canvas.height - height, patch.y ?? el.y)),
     });
+  };
+
+  // Calques de texte
+  const updateLayer = (elId, layerId, patch) => {
+    const el = canvas.banners.find((b) => b.id === elId);
+    if (!el) return;
+    updateEl(elId, { layers: el.layers.map((l) => (l.id === layerId ? { ...l, ...patch } : l)) });
+  };
+  const moveLayer = (elId, layerId, patch) => {
+    const el = canvas.banners.find((b) => b.id === elId);
+    const l = el?.layers.find((x) => x.id === layerId);
+    if (!l) return;
+    updateLayer(elId, layerId, {
+      x: patch.x ?? l.x,
+      y: patch.y ?? l.y,
+      width: Math.max(8, patch.width ?? l.width),
+      height: Math.max(8, patch.height ?? l.height),
+    });
+  };
+  const addLayer = (el) => {
+    const id = newId("l");
+    updateEl(el.id, { layers: [...el.layers, { ...GRAPHIC_LAYER_DEFAULTS, id, y: 40 + el.layers.length * 90 }] });
+    setSelectedLayerId(id);
+  };
+  const duplicateLayer = (el, l) => {
+    const id = newId("l");
+    updateEl(el.id, { layers: [...el.layers, { ...l, id, y: l.y + 60 }] });
+    setSelectedLayerId(id);
+  };
+  const removeLayer = (el, layerId) => {
+    updateEl(el.id, { layers: el.layers.filter((l) => l.id !== layerId) });
+    if (selectedLayerId === layerId) setSelectedLayerId(null);
   };
 
   function buildCanvasUrl() {
@@ -217,11 +413,13 @@ export default function CanvasTab({ state, push }) {
       <div className="mb-4">
         <h2 className="text-lg font-semibold">Canevas</h2>
         <p className="text-sm opacity-70">
-          Une fenêtre qui compose librement des bandeaux, un chrono et des infographies
-          broadcast. Déplacez les éléments dans l'aperçu (poignée orange pour la taille).
-          Fond vert ou transparent pour l'incrustation.
+          Une fenêtre qui compose librement des bandeaux, un chrono et vos infographies
+          broadcast (image fournie par l'équipe + textes avec variables). Déplacez les
+          éléments dans l'aperçu ; poignée dans le coin pour la taille.
         </p>
       </div>
+
+      <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={onFile} className="hidden" />
 
       <div className="flex flex-wrap items-end gap-3 mb-4">
         <div>
@@ -258,7 +456,7 @@ export default function CanvasTab({ state, push }) {
               <button
                 key={b.id}
                 type="button"
-                onClick={() => setSelectedId(b.id)}
+                onClick={() => { setSelectedId(b.id); setSelectedLayerId(null); }}
                 className={
                   "w-full text-left text-sm px-3 py-2 rounded-xl border transition cursor-pointer " +
                   (b.id === selectedId
@@ -275,27 +473,32 @@ export default function CanvasTab({ state, push }) {
             );
           })}
           <div className="pt-2 space-y-1.5">
-            {[
-              ["Ajouter un bandeau", TvIcon, addBanner, ""],
-              ["Ajouter un chrono", ClockIcon, addTimer, "border-emerald-400/60 text-emerald-700 dark:text-emerald-300"],
-              ["Ajouter une infographie", RectangleStackIcon, addLowerThird, "border-rose-400/60 text-rose-700 dark:text-rose-300"],
-            ].map(([label, Icon, fn, cls]) => (
-              <button
-                key={label}
-                type="button"
-                onClick={fn}
-                className={`w-full inline-flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer ${cls}`}
-              >
-                <Icon className="w-4 h-4" />
-                {label}
-              </button>
-            ))}
+            <button type="button" onClick={addBanner} className="w-full inline-flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer">
+              <TvIcon className="w-4 h-4" /> Ajouter un bandeau
+            </button>
+            <button type="button" onClick={addTimer} className="w-full inline-flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-xl border border-dashed border-emerald-400/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 cursor-pointer">
+              <ClockIcon className="w-4 h-4" /> Ajouter un chrono
+            </button>
+            <button type="button" onClick={() => pickImage(null)} disabled={uploading} className="w-full inline-flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-xl border border-dashed border-rose-400/60 text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/30 disabled:opacity-50 cursor-pointer">
+              <ArrowUpTrayIcon className="w-4 h-4" /> {uploading ? "Téléversement…" : "Ajouter une infographie (image)"}
+            </button>
+            {uploadError && <p className="text-xs text-red-600 dark:text-red-400">{uploadError}</p>}
           </div>
         </div>
 
         <div>
           <div className="text-xs opacity-60 mb-2 tabular-nums text-center">Aperçu — {canvas.width}×{canvas.height} px</div>
-          <CanvasEditor state={state} canvas={canvas} selectedId={selectedId} onSelect={setSelectedId} onMove={moveEl} showSampleTimer={sampleTimer} />
+          <CanvasEditor
+            state={state}
+            canvas={canvas}
+            selectedId={selectedId}
+            selectedLayerId={selectedLayerId}
+            onSelect={setSelectedId}
+            onSelectLayer={setSelectedLayerId}
+            onMove={moveEl}
+            onMoveLayer={moveLayer}
+            showSampleTimer={sampleTimer}
+          />
         </div>
       </div>
 
@@ -372,38 +575,78 @@ export default function CanvasTab({ state, push }) {
             </div>
           )}
 
-          {selected.kind === "lowerThird" && (
-            <div className="mt-4 grid lg:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <div className="text-xs uppercase tracking-wide opacity-60">Champs</div>
-                <FieldEditor label="Ligne principale" field={selected.fields.title} onChange={(f) => updateEl(selected.id, { fields: { ...selected.fields, title: f } })} />
-                <FieldEditor label="Ligne secondaire" field={selected.fields.subtitle} onChange={(f) => updateEl(selected.id, { fields: { ...selected.fields, subtitle: f } })} />
-                <FieldEditor label="Boîte de droite" field={selected.fields.box} onChange={(f) => updateEl(selected.id, { fields: { ...selected.fields, box: f } })} />
-                <FieldEditor label="Étiquette de la boîte" field={selected.fields.boxLabel} onChange={(f) => updateEl(selected.id, { fields: { ...selected.fields, boxLabel: f } })} />
-                <p className="text-[11px] opacity-60">L'infographie disparaît d'elle-même quand tous ses champs sont vides (ex. aucun compétiteur sélectionné).</p>
-              </div>
-              <div className="space-y-2">
-                <div className="text-xs uppercase tracking-wide opacity-60">Style</div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <ColorRow label="Bordeaux (tuile, bande)" value={selected.style.primary} onChange={(v) => updateEl(selected.id, { style: { ...selected.style, primary: v } })} />
-                  <ColorRow label="Charbon (barres)" value={selected.style.panel} onChange={(v) => updateEl(selected.id, { style: { ...selected.style, panel: v } })} />
-                  <ColorRow label="Crème (liserés)" value={selected.style.light} onChange={(v) => updateEl(selected.id, { style: { ...selected.style, light: v } })} />
-                  <ColorRow label="Texte" value={selected.style.text} onChange={(v) => updateEl(selected.id, { style: { ...selected.style, text: v } })} />
+          {selected.kind === "graphic" && (
+            <div className="mt-4 grid lg:grid-cols-[260px_1fr] gap-4">
+              <div className="space-y-3">
+                <div className="text-xs uppercase tracking-wide opacity-60">Image</div>
+                <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-2 bg-[repeating-conic-gradient(#8883_0%_25%,transparent_0%_50%)] bg-[length:16px_16px]">
+                  {selected.image ? (
+                    <img src={selected.image} alt="" className="w-full h-auto rounded-md" />
+                  ) : (
+                    <div className="text-xs opacity-60 italic p-3 text-center">Aucune image</div>
+                  )}
                 </div>
-                <div>
-                  <Label htmlFor="ltfont">Police</Label>
-                  <select id="ltfont" className={`${INPUT} mt-1`} value={selected.font} onChange={(e) => updateEl(selected.id, { font: e.target.value })}>
-                    {Object.entries(FONTS).map(([k, f]) => <option key={k} value={k}>{f.label}</option>)}
-                  </select>
-                </div>
+                <button type="button" onClick={() => pickImage(selected.id)} disabled={uploading} className="w-full inline-flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer">
+                  <ArrowUpTrayIcon className="w-4 h-4" /> Remplacer l'image…
+                </button>
                 <label className="flex items-center gap-2 select-none cursor-pointer">
-                  <input type="checkbox" checked={selected.showLogo !== false} onChange={(e) => updateEl(selected.id, { showLogo: e.target.checked })} className="w-4 h-4" />
-                  <span className="text-sm">Tuile logo</span>
+                  <input type="checkbox" checked={!!selected.keyColor} onChange={(e) => updateEl(selected.id, { keyColor: e.target.checked ? "#00ff00" : null })} className="w-4 h-4" />
+                  <span className="text-sm">Rendre une couleur transparente</span>
+                </label>
+                {selected.keyColor && (
+                  <div className="space-y-2 pl-6">
+                    <ColorRow label="Couleur à effacer" value={selected.keyColor} onChange={(v) => updateEl(selected.id, { keyColor: v })} />
+                    <div>
+                      <Label htmlFor="ktol">Tolérance — {Math.round(selected.keyTolerance * 100)} %</Label>
+                      <input id="ktol" type="range" min="0.05" max="0.8" step="0.01" value={selected.keyTolerance} onChange={(e) => updateEl(selected.id, { keyTolerance: Number(e.target.value) })} className="w-full mt-1" />
+                    </div>
+                    <p className="text-[11px] opacity-60">Le fond vert du gabarit devient transparent dans l'app : avec un fond de canevas transparent, OBS l'affiche sans incrustation.</p>
+                  </div>
+                )}
+                <label className="flex items-center gap-2 select-none cursor-pointer">
+                  <input type="checkbox" checked={selected.hideWhenEmpty !== false} onChange={(e) => updateEl(selected.id, { hideWhenEmpty: e.target.checked })} className="w-4 h-4" />
+                  <span className="text-sm">Masquer quand tous les textes sont vides</span>
                 </label>
                 <label className="flex items-center gap-2 select-none cursor-pointer">
                   <input type="checkbox" checked={selected.animate !== false} onChange={(e) => updateEl(selected.id, { animate: e.target.checked })} className="w-4 h-4" />
-                  <span className="text-sm">Animer l'entrée quand le texte change</span>
+                  <span className="text-sm">Animer l'entrée quand le sujet change</span>
                 </label>
+              </div>
+
+              <div className="space-y-2 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-xs uppercase tracking-wide opacity-60">Calques de texte ({selected.layers.length})</div>
+                  <button type="button" onClick={() => addLayer(selected)} className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border border-sky-400/60 text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-950/30 cursor-pointer">
+                    <PlusIcon className="w-3.5 h-3.5" /> Ajouter un texte
+                  </button>
+                </div>
+                {selected.layers.length === 0 && (
+                  <p className="text-xs opacity-60 italic">Aucun calque. Ajoutez un texte, puis placez-le sur l'image dans l'aperçu.</p>
+                )}
+                {selected.layers.map((l) => (
+                  <div key={l.id}>
+                    {l.id === selectedLayerId ? (
+                      <LayerEditor
+                        layer={l}
+                        onChange={(patch) => updateLayer(selected.id, l.id, patch)}
+                        onRemove={() => removeLayer(selected, l.id)}
+                        onDuplicate={() => duplicateLayer(selected, l)}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedLayerId(l.id)}
+                        className="w-full text-left rounded-xl border border-zinc-200 dark:border-zinc-800 px-3 py-2 text-sm hover:bg-zinc-100/60 dark:hover:bg-zinc-800/40 cursor-pointer"
+                      >
+                        <span className="font-mono text-xs truncate block">{l.text || "(vide)"}</span>
+                        <span className="text-[11px] opacity-60 tabular-nums">{FONTS[l.font]?.label} · {l.size} px · ({l.x},{l.y}) {l.width}×{l.height}</span>
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <p className="text-[11px] opacity-60">
+                  Variables : {VARIABLES.map((v) => `{${v.key}}`).join(" ")}
+                </p>
               </div>
             </div>
           )}
@@ -420,7 +663,7 @@ export default function CanvasTab({ state, push }) {
           windowName="rodeo-canvas"
           windowFeatures={`noopener,noreferrer,width=${canvas.width},height=${canvas.height}`}
           label="Ouvrir le canevas"
-          icon={RectangleStackIcon}
+          icon={PhotoIcon}
           onBeforeLaunch={() => bus?.post({ type: "sync:update", payload: state })}
           stacked
         />
