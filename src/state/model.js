@@ -15,14 +15,20 @@
  *                      que s'il est armé). Reprend armedByDefault à chaque
  *                      changement de discipline (timerArmedFor mémorise laquelle).
  *
- *   Competition        { roster: [{ id, name }], entries: [Entry], currentId }
+ *   Competition        { roster: [Competitor], entries: [Entry], currentId }
+ *   Competitor         { id, name, hometown, animal, contractor }
+ *                      animal / contractor : bête tirée et entrepreneur de bétail
+ *   look               apparence des sorties (voir look.js)
  *   Entry              { id, name, competitorId?, raw, parsed, timeHint,
  *                        time?, penalty? }   // time + penalty = parsed (chrono)
  *
  * Miroir de la compétition active, recalculé par normalizeState() à chaque
  * écriture. Les sorties (tableau, bandeaux, canevas) ne lisent que ces champs :
- *   eventName, scoreMode, entries, currentCompetitor (+ timerArmed, timerTarget)
+ *   eventName, scoreMode, entries, currentCompetitor, currentCompetitorInfo
+ *   (+ timerArmed, timerTarget, rodeoName)
  */
+
+import { normalizeLook } from "./look.js";
 
 const newId = () =>
   (typeof crypto !== "undefined" && crypto.randomUUID)
@@ -77,11 +83,21 @@ function normalizeDiscipline(d) {
   };
 }
 
+const text = (v) => String(v ?? "").trim();
+
+function normalizeCompetitor(p) {
+  return {
+    id: p.id || newId(),
+    name: text(p.name),
+    hometown: text(p.hometown),
+    animal: text(p.animal),
+    contractor: text(p.contractor),
+  };
+}
+
 function normalizeCompetition(c) {
   const roster = Array.isArray(c?.roster)
-    ? c.roster
-        .filter((p) => p && String(p.name ?? "").trim())
-        .map((p) => ({ id: p.id || newId(), name: String(p.name).trim() }))
+    ? c.roster.filter((p) => p && text(p.name)).map(normalizeCompetitor)
     : [];
   const entries = Array.isArray(c?.entries) ? c.entries : [];
   const currentId = roster.some((p) => p.id === c?.currentId) ? c.currentId : null;
@@ -164,6 +180,11 @@ export function normalizeState(input) {
     timerArmedFor: discipline.id,
     timerTarget: discipline.timerTarget,
     pendingRun,
+    look: normalizeLook(state.look),
+    rodeoName: rodeo.name,
+    currentCompetitorInfo: current
+      ? { name: current.name, hometown: current.hometown, animal: current.animal, contractor: current.contractor }
+      : null,
     eventName: discipline.name,
     scoreMode: discipline.scoreMode,
     entries: comp.entries,
@@ -213,22 +234,41 @@ export function nextPendingId(competition, fromId, entries = competition.entries
 }
 
 /**
- * Texte (un nom par ligne) → ordre de passage. Réutilise l'id d'un compétiteur
- * déjà présent sous le même nom pour garder le lien avec ses résultats.
+ * Texte (un compétiteur par ligne) → ordre de passage.
+ *   Nom | Ville | Animal | Entrepreneur      (séparateur « | » ou tabulation,
+ *                                            les colonnes de droite sont optionnelles)
+ * Réutilise l'id d'un compétiteur déjà présent sous le même nom pour garder le
+ * lien avec ses résultats ; ses champs sont remplacés par ceux de la ligne.
  */
-export function rosterFromText(text, previous = []) {
+export function rosterFromText(input, previous = []) {
   const pool = new Map();
   for (const p of previous) {
     const key = p.name.toLocaleLowerCase("fr");
     if (!pool.has(key)) pool.set(key, []);
     pool.get(key).push(p.id);
   }
-  return String(text)
+  return String(input)
     .split(/\r?\n/)
     .map((line) => line.replace(/^\s*\d+[.)-]\s*/, "").trim()) // « 1. Nom » accepté
     .filter(Boolean)
-    .map((name) => {
+    .map((line) => {
+      const [name, hometown, animal, contractor] = line.split(/\t|\s*\|\s*/).map((s) => s.trim());
+      if (!name) return null;
       const ids = pool.get(name.toLocaleLowerCase("fr"));
-      return { id: ids?.shift() ?? newId(), name };
-    });
+      return normalizeCompetitor({ id: ids?.shift(), name, hometown, animal, contractor });
+    })
+    .filter(Boolean);
+}
+
+/** Inverse de rosterFromText : n'écrit les colonnes que si l'une d'elles est remplie. */
+export function rosterToText(roster) {
+  const hasExtra = roster.some((p) => p.hometown || p.animal || p.contractor);
+  return roster
+    .map((p) => {
+      if (!hasExtra) return p.name;
+      const cols = [p.name, p.hometown, p.animal, p.contractor];
+      while (cols.length > 1 && !cols[cols.length - 1]) cols.pop();
+      return cols.join(" | ");
+    })
+    .join("\n");
 }

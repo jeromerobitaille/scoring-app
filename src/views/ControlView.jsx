@@ -8,7 +8,6 @@ import {
   updateActiveCompetition,
 } from "../state/model";
 import Button from "../components/ui/Button";
-import Card from "../components/ui/Card";
 import Label from "../components/ui/Label";
 import TextInput from "../components/ui/TextInput";
 import EntriesTable from "../components/EntriesTable";
@@ -52,9 +51,6 @@ function refocus(ref) {
   if (document.activeElement === el) el.blur();
   el.focus({ preventScroll: true });
 }
-
-const SELECT_CLASS =
-  "min-w-0 rounded-xl border px-3 py-2 bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700";
 
 function NetStatusDot({ status }) {
   const color =
@@ -125,8 +121,8 @@ function KebabMenu({ onClearAll }) {
   );
 }
 
-/** Ordre de passage de la compétition active. */
-function RosterPanel({ competition, scoreMode, onSelect, onNext, onQuickAdd, onEditList }) {
+/** Ordre de passage de la compétition active (colonne de gauche). */
+function RosterPanel({ competition, scoreMode, showDetails, onSelect, onNext, onQuickAdd, onEditList }) {
   const [draft, setDraft] = useState("");
   const listRef = useRef(null);
   const results = new Map(
@@ -150,13 +146,12 @@ function RosterPanel({ competition, scoreMode, onSelect, onNext, onQuickAdd, onE
   }
 
   return (
-    <Card className="flex flex-col lg:max-h-[calc(100vh-11rem)]">
-      <div className="flex items-baseline justify-between gap-2 mb-3">
-        <h2 className="text-lg font-semibold">Ordre de passage</h2>
-        <span className="text-xs opacity-60 tabular-nums">
-          {doneCount}/{competition.roster.length}
-        </span>
-      </div>
+    <aside className="flex flex-col lg:sticky lg:top-[4.25rem] lg:max-h-[calc(100vh-6rem)]">
+      <SectionTitle
+        right={<span className="tabular-nums">{doneCount}/{competition.roster.length}</span>}
+      >
+        Ordre de passage
+      </SectionTitle>
 
       {competition.roster.length === 0 ? (
         <div className="text-sm opacity-70 py-4 space-y-2">
@@ -166,38 +161,45 @@ function RosterPanel({ competition, scoreMode, onSelect, onNext, onQuickAdd, onE
           </button>
         </div>
       ) : (
-        <ol ref={listRef} className="flex-1 min-h-0 overflow-y-auto -mx-2 space-y-0.5">
+        <ol ref={listRef} className="flex-1 min-h-0 overflow-y-auto -mx-1 pr-1">
           {competition.roster.map((p, i) => {
             const isCurrent = p.id === competition.currentId;
             const result = results.get(p.id);
+            const detail = showDetails ? [p.hometown, p.animal].filter(Boolean).join(" · ") : "";
             return (
               <li key={p.id} data-current={isCurrent}>
                 <button
                   type="button"
                   onClick={() => onSelect(p.id)}
                   className={
-                    "w-full flex items-center gap-2 rounded-xl px-2 py-2 text-left text-sm cursor-pointer transition " +
+                    "w-full flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm cursor-pointer transition " +
                     (isCurrent
                       ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
-                      : "hover:bg-zinc-100 dark:hover:bg-zinc-800")
+                      : "hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60")
                   }
                 >
-                  <span className="w-6 text-right tabular-nums opacity-60 flex-shrink-0">{i + 1}</span>
-                  {isCurrent
-                    ? <PlayIcon className="w-3.5 h-3.5 flex-shrink-0" />
-                    : <span className="w-3.5 flex-shrink-0" />}
-                  <span className={`flex-1 truncate ${result && !isCurrent ? "opacity-50" : "font-medium"}`}>
-                    {p.name}
+                  <span className={`w-5 text-right tabular-nums text-xs flex-shrink-0 ${isCurrent ? "opacity-80" : "opacity-50"}`}>
+                    {i + 1}
                   </span>
-                  <span className="tabular-nums text-xs flex-shrink-0 opacity-80">
+                  <span className="flex-1 min-w-0">
+                    <span className={`block truncate ${result && !isCurrent ? "opacity-50" : "font-medium"}`}>
+                      {p.name}
+                    </span>
+                    {detail && (
+                      <span className={`block truncate text-[11px] ${isCurrent ? "opacity-70" : "opacity-50"}`}>
+                        {detail}
+                      </span>
+                    )}
+                  </span>
+                  <span className="tabular-nums text-xs flex-shrink-0">
                     {result ? (
                       <>
                         {formatScore(result.parsed, entryDisplayMode(result, scoreMode))}
-                        {result.penalty > 0 && (
-                          <span className="ml-1 text-red-500">+{result.penalty}</span>
-                        )}
+                        {result.penalty > 0 && <span className="ml-1 text-red-500">+{result.penalty}</span>}
                       </>
-                    ) : "—"}
+                    ) : (
+                      <span className="opacity-40">—</span>
+                    )}
                   </span>
                 </button>
               </li>
@@ -211,26 +213,26 @@ function RosterPanel({ competition, scoreMode, onSelect, onNext, onQuickAdd, onE
           <button
             type="button"
             onClick={onNext}
-            className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+            className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm font-medium hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 cursor-pointer"
           >
             <ChevronDoubleRightIcon className="w-4 h-4" />
             Compétiteur suivant
           </button>
         )}
-        <form onSubmit={submitDraft} className="flex gap-2">
+        <form onSubmit={submitDraft} className="flex gap-1.5">
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Ajouter à la liste…"
             aria-label="Ajouter un compétiteur à la liste"
             autoComplete="off"
-            className="flex-1 min-w-0 rounded-xl border px-3 py-2 text-sm outline-none border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900"
+            className="flex-1 min-w-0 rounded-lg border px-2.5 py-1.5 text-sm outline-none border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900"
           />
           <button
             type="submit"
             disabled={!draft.trim()}
             aria-label="Ajouter"
-            className="rounded-xl border border-zinc-300 dark:border-zinc-700 px-2 disabled:opacity-40 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+            className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-2 disabled:opacity-40 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 cursor-pointer"
           >
             <PlusCircleIcon className="w-5 h-5" />
           </button>
@@ -240,10 +242,38 @@ function RosterPanel({ competition, scoreMode, onSelect, onNext, onQuickAdd, onE
           onClick={onEditList}
           className="text-xs underline opacity-60 hover:opacity-100 cursor-pointer"
         >
-          Modifier la liste complète
+          Modifier la liste complète (ville, animal…)
         </button>
       </div>
-    </Card>
+    </aside>
+  );
+}
+
+/** Titre de section : petites capitales + filet, à la place des cartes. */
+function SectionTitle({ children, right }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-1.5 mb-3">
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400">
+        {children}
+      </h2>
+      {right && <span className="text-xs text-zinc-500 dark:text-zinc-400">{right}</span>}
+    </div>
+  );
+}
+
+/** Sélecteur de la barre d'outils : libellé discret + <select> sans cadre. */
+function ToolbarSelect({ label, value, onChange, children, className = "" }) {
+  return (
+    <label className={`flex items-center gap-1.5 min-w-0 ${className}`}>
+      <span className="text-[11px] uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex-shrink-0">{label}</span>
+      <select
+        value={value}
+        onChange={onChange}
+        className="min-w-0 flex-1 rounded-lg bg-transparent hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 px-2 py-1 font-semibold text-sm outline-none cursor-pointer focus:ring-2 focus:ring-zinc-400/40"
+      >
+        {children}
+      </select>
+    </label>
   );
 }
 
@@ -502,90 +532,78 @@ export default function ControlView() {
     requestAnimationFrame(() => refocus(nameRef));
   }
 
-  return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-zinc-100 to-zinc-200 dark:from-zinc-950 dark:to-zinc-900 text-zinc-900 dark:text-zinc-100">
-      <div className="flex-1 mx-auto w-full max-w-7xl px-6 pt-5 pb-4 space-y-4">
+  const modeChips = [
+    isTimeMode ? "Temps · plus bas gagne" : "Pointage · plus haut gagne",
+    discipline.penalties.length > 0 && `Pénalités ${discipline.penalties.map((p) => `+${p}`).join(" / ")}`,
+    discipline.timerTarget != null && `Cible ${discipline.timerTarget} s`,
+  ].filter(Boolean);
 
-        <header className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <img src={logo} alt="" className="h-12 w-auto flex-shrink-0" />
-            <div className="min-w-0">
-              <h1 className="text-xl md:text-2xl font-bold leading-tight truncate">
-                {discipline.name}
-              </h1>
-              <p className="text-xs opacity-60 truncate">{rodeo.name} · Saisie des pointages</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <ThemeToggle
-              theme={state.theme}
-              onChange={(t) => push({ ...state, theme: t })}
-            />
+  return (
+    <div className="min-h-screen flex flex-col bg-zinc-100 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
+      {/* Barre d'outils */}
+      <header className="sticky top-0 z-20 border-b border-zinc-200 dark:border-zinc-800 bg-white/85 dark:bg-zinc-950/85 backdrop-blur">
+        <div className="mx-auto max-w-7xl px-4 h-14 flex items-center gap-3">
+          <img src={logo} alt="" className="h-9 w-auto flex-shrink-0" />
+          <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-800" />
+          <ToolbarSelect label="Rodéo" value={rodeo.id} onChange={(e) => onSelectChange({ currentRodeoId: e.target.value })} className="w-56">
+            {state.rodeos.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+          </ToolbarSelect>
+          <ToolbarSelect label="Discipline" value={discipline.id} onChange={(e) => onSelectChange({ currentDisciplineId: e.target.value })} className="flex-1">
+            {state.disciplines.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </ToolbarSelect>
+          <div className="flex items-center gap-0.5 flex-shrink-0">
+            <span className="hidden md:inline-flex mr-2 text-xs text-zinc-500 dark:text-zinc-400">
+              <NetStatusDot status={sync?.netStatus || "local"} />
+            </span>
+            <ThemeToggle theme={state.theme} onChange={(t) => push({ ...state, theme: t })} />
             <button
               type="button"
               onClick={openSettings}
               aria-label="Paramètres"
               title="Paramètres"
-              className="p-2 rounded-xl hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 cursor-pointer"
+              className="p-2 rounded-lg hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 cursor-pointer"
             >
               <Cog6ToothIcon className="w-5 h-5" />
             </button>
             <KebabMenu onClearAll={() => setConfirmClearOpen(true)} />
           </div>
-        </header>
+        </div>
+      </header>
 
-        {/* Barre de contexte : rodéo + discipline (le mode suit la discipline) */}
-        <div className="flex flex-col md:flex-row gap-3 md:items-center md:gap-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white/60 dark:bg-zinc-900/60 backdrop-blur px-4 py-3">
-          <div className="flex items-center gap-3 min-w-0 md:w-72">
-            <Label className="flex-shrink-0">Rodéo</Label>
-            <select
-              className={`flex-1 ${SELECT_CLASS}`}
-              value={rodeo.id}
-              onChange={(e) => onSelectChange({ currentRodeoId: e.target.value })}
-            >
-              {state.rodeos.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-            </select>
+      <div className="flex-1 mx-auto w-full max-w-7xl px-4 pt-5 pb-6">
+        {/* Titre de la compétition */}
+        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 mb-5">
+          <div className="min-w-0">
+            <h1 className="text-2xl md:text-3xl font-bold leading-tight truncate">{discipline.name}</h1>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate">{rodeo.name}</p>
           </div>
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            <Label className="flex-shrink-0">Discipline</Label>
-            <select
-              className={`flex-1 ${SELECT_CLASS}`}
-              value={discipline.id}
-              onChange={(e) => onSelectChange({ currentDisciplineId: e.target.value })}
-            >
-              {state.disciplines.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {modeChips.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => openSettings("disciplines")}
+                title="Configurer les disciplines"
+                className="rounded-md border border-zinc-300 dark:border-zinc-700 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 cursor-pointer"
+              >
+                {c}
+              </button>
+            ))}
           </div>
-          <button
-            type="button"
-            onClick={() => openSettings("disciplines")}
-            title="Configurer les disciplines"
-            className={
-              "flex-shrink-0 rounded-full px-3 py-1 text-xs font-semibold cursor-pointer " +
-              (isTimeMode
-                ? "bg-sky-500/15 text-sky-700 dark:text-sky-300"
-                : "bg-violet-500/15 text-violet-700 dark:text-violet-300")
-            }
-          >
-            {isTimeMode ? "Temps · plus bas = meilleur" : "Pointage · plus haut = meilleur"}
-            {discipline.penalties.length > 0 && ` · pénalités ${discipline.penalties.map((p) => `+${p}`).join("/")}`}
-            {discipline.timerTarget != null && ` · cible ${discipline.timerTarget} s`}
-          </button>
         </div>
 
-        <div className="grid lg:grid-cols-12 gap-4 items-start">
-          <div className="lg:col-span-4 lg:sticky lg:top-4">
-            <RosterPanel
-              competition={competition}
-              scoreMode={discipline.scoreMode}
-              onSelect={selectCompetitor}
-              onNext={selectNext}
-              onQuickAdd={quickAdd}
-              onEditList={() => openSettings("rodeos")}
-            />
-          </div>
+        <div className="grid lg:grid-cols-[280px_1fr] gap-8 items-start">
+          <RosterPanel
+            competition={competition}
+            scoreMode={discipline.scoreMode}
+            showDetails={state.look?.showHometown || state.look?.showAnimal}
+            onSelect={selectCompetitor}
+            onNext={selectNext}
+            onQuickAdd={quickAdd}
+            onEditList={() => openSettings("rodeos")}
+          />
 
-          <div className="lg:col-span-8 space-y-4 min-w-0">
+          <div className="space-y-7 min-w-0">
             <LiveTimerPanel
               onStop={handleTimerStop}
               onOpenSettings={() => openSettings("timer")}
@@ -598,24 +616,25 @@ export default function ControlView() {
               target={discipline.timerTarget}
             />
 
-            <Card>
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <h2 className="text-lg font-semibold">
-                  {editingId ? "Modifier le résultat" : isTimeMode ? "Saisie manuelle" : "Saisir le pointage"}
-                </h2>
-                {editingId ? (
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 inline-flex items-center cursor-pointer"
-                  >
-                    <XMarkIcon className="w-4 h-4 mr-1" />
-                    Annuler (Échap)
-                  </button>
-                ) : (
-                  <span className="text-xs opacity-50 hidden sm:inline">Entrée pour valider</span>
-                )}
-              </div>
+            <section>
+              <SectionTitle
+                right={
+                  editingId ? (
+                    <button
+                      type="button"
+                      onClick={resetForm}
+                      className="inline-flex items-center hover:text-zinc-900 dark:hover:text-zinc-100 cursor-pointer"
+                    >
+                      <XMarkIcon className="w-3.5 h-3.5 mr-1" />
+                      Annuler (Échap)
+                    </button>
+                  ) : (
+                    <span className="hidden sm:inline">Entrée pour valider</span>
+                  )
+                }
+              >
+                {editingId ? "Modifier le résultat" : isTimeMode ? "Saisie manuelle" : "Saisir le pointage"}
+              </SectionTitle>
               <div className="grid md:grid-cols-12 gap-3 items-end">
                 <div className="md:col-span-5">
                   <Label htmlFor="name">Compétiteur</Label>
@@ -630,6 +649,7 @@ export default function ControlView() {
                     autoComplete="off"
                     enterKeyHint="next"
                     list="roster-names"
+                    className="!rounded-lg !py-2"
                   />
                   <datalist id="roster-names">
                     {competition.roster.map((p) => <option key={p.id} value={p.name} />)}
@@ -649,11 +669,11 @@ export default function ControlView() {
                     inputMode="decimal"
                     enterKeyHint="done"
                     aria-invalid={scoreInvalid || undefined}
-                    className={scoreInvalid ? "border-red-500 ring-1 ring-red-500/40 focus:ring-red-500" : ""}
+                    className={"!rounded-lg !py-2 " + (scoreInvalid ? "border-red-500 ring-1 ring-red-500/40 focus:ring-red-500" : "")}
                   />
                 </div>
                 <div className="md:col-span-3">
-                  <Button onClick={submitEntry} disabled={!canSubmit} className="w-full">
+                  <Button onClick={submitEntry} disabled={!canSubmit} className="w-full !rounded-lg !py-2">
                     {editingId ? (
                       <>
                         <CheckIcon className="w-5 h-5 inline-block mr-1 -mt-0.5" />
@@ -685,15 +705,14 @@ export default function ControlView() {
                   « {name.trim()} » n'est pas dans la liste — il y sera ajouté.
                 </div>
               )}
-            </Card>
+            </section>
 
-            <Card>
-              <div className="flex items-baseline justify-between mb-3">
-                <h2 className="text-lg font-semibold">Résultats</h2>
-                <span className="text-xs opacity-60 tabular-nums">
-                  {competition.entries.length} résultat{competition.entries.length > 1 ? "s" : ""}
-                </span>
-              </div>
+            <section>
+              <SectionTitle
+                right={<span className="tabular-nums">{competition.entries.length} résultat{competition.entries.length > 1 ? "s" : ""}</span>}
+              >
+                Résultats
+              </SectionTitle>
               <EntriesTable
                 key={`${rodeo.id}:${discipline.id}`}
                 entries={competition.entries}
@@ -702,22 +721,18 @@ export default function ControlView() {
                 onEdit={startEdit}
                 editingId={editingId}
               />
-            </Card>
+            </section>
           </div>
         </div>
       </div>
 
-      <footer className="mt-2 border-t border-zinc-200 dark:border-zinc-800 bg-white/60 dark:bg-zinc-950/60 backdrop-blur">
-        <div className="mx-auto max-w-7xl px-6 py-2 flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-400 gap-4">
+      <footer className="border-t border-zinc-200 dark:border-zinc-800">
+        <div className="mx-auto max-w-7xl px-4 py-2 flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 gap-4">
           <div className="flex items-center gap-4 min-w-0">
             <NetStatusDot status={sync?.netStatus || "local"} />
-            <span className="opacity-70">
-              Room: <span className="font-mono">{sync?.roomId || "default"}</span>
-            </span>
+            <span>Room <span className="font-mono">{sync?.roomId || "default"}</span></span>
           </div>
-          <div className="truncate opacity-70">
-            {rodeo.name} · {discipline.name}
-          </div>
+          <span className="truncate">{rodeo.name} · {discipline.name}</span>
         </div>
       </footer>
 

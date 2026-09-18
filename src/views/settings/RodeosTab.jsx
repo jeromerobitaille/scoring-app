@@ -6,13 +6,12 @@ import {
   getCompetition,
   newId,
   rosterFromText,
+  rosterToText,
   updateCompetition,
 } from "../../state/model";
 
 const INPUT =
   "w-full min-w-0 rounded-xl border px-3 py-2 text-sm outline-none bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700";
-
-const rosterToText = (roster) => roster.map((p) => p.name).join("\n");
 
 function RodeoList({ state, push, selectedId, onSelect }) {
   const [newName, setNewName] = useState("");
@@ -173,10 +172,14 @@ function RosterEditor({ state, push, rodeoId, disciplineId }) {
         onBlur={() => { if (dirty) save(); }}
         rows={16}
         spellCheck={false}
-        placeholder={"Un compétiteur par ligne, dans l'ordre de passage.\nOn peut coller une colonne depuis Excel."}
+        placeholder={"Un compétiteur par ligne, dans l'ordre de passage :\nNom | Ville | Animal | Entrepreneur\n\nSeul le nom est obligatoire. On peut coller des colonnes depuis Excel."}
         aria-label="Liste des compétiteurs"
         className="flex-1 w-full rounded-xl border px-3 py-2 text-sm font-mono leading-6 outline-none bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 resize-y"
       />
+      <p className="mt-1 text-[11px] opacity-60">
+        Format : <span className="font-mono">Nom | Ville | Animal | Entrepreneur</span> — la ville et
+        l'animal s'affichent sur le tableau et les bandeaux (voir Apparence).
+      </p>
       <div className="mt-2 flex items-center justify-between gap-3 text-xs">
         <span className="opacity-70">
           {preview.length} compétiteur{preview.length > 1 ? "s" : ""}

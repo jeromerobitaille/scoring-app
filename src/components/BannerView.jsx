@@ -4,24 +4,17 @@ import { computeRanking, formatScore, entryDisplayMode } from "../utils/score";
 import bannerLogo from "../assets/banner.jpg";
 import logo from "../assets/logo.png";
 import TimerDisplay from "./TimerDisplay";
-import { bannerCardStyle } from "./bannerCard";
+import { DEFAULT_LOOK, TIMER_FONT_KEY, backgroundFor, cardStyle, fontStyle, hexToRgba, rankBadge } from "../state/look";
 
 const BREAKING_MS = 5000;
 const ROTATE_MS = 5000;
-
-const rankBadgeBg = (rank) => {
-  if (rank === 1) return "linear-gradient(135deg,#FFD700 0%,#FFE68A 100%)";
-  if (rank === 2) return "linear-gradient(135deg,#D9D9D9 0%,#FFFFFF 100%)";
-  if (rank === 3) return "linear-gradient(135deg,#CD7F32 0%,#E6A260 100%)";
-  return "linear-gradient(135deg,#2f2f2f 0%,#3a3a3a 100%)";
-};
 
 /**
  * Chrono FarmTek en direct, par-dessus le bandeau : le temps seul, précédé du
  * nom du compétiteur si l'option est active. Sous l'annonce « breaking »
  * (zIndex 50) pour qu'un résultat qu'on vient de saisir reste prioritaire.
  */
-function LiveTimerOverlay({ frame, competitor, target, containerW, containerH }) {
+function LiveTimerOverlay({ frame, competitor, target, containerW, containerH, look }) {
   return (
     <motion.div
       key="live-timer"
@@ -33,7 +26,7 @@ function LiveTimerOverlay({ frame, competitor, target, containerW, containerH })
         position: "absolute",
         inset: 0,
         zIndex: 40,
-        background: "linear-gradient(180deg,#000,#0b0b0b)",
+        background: backgroundFor(look),
       }}
     >
       <TimerDisplay
@@ -42,6 +35,9 @@ function LiveTimerOverlay({ frame, competitor, target, containerW, containerH })
         width={containerW}
         height={containerH}
         target={target}
+        font={TIMER_FONT_KEY[look.fonts.numbers]}
+        color={look.colors.text}
+        targetColor={look.colors.timerTarget}
       />
     </motion.div>
   );
@@ -63,7 +59,12 @@ export default function BannerView({
   competitor = null,
   timerTarget = null,
   contextKey = null,
+  look = DEFAULT_LOOK,
+  roster = [],
 }) {
+  const display = fontStyle(look.fonts.display);
+  const numbers = fontStyle(look.fonts.numbers);
+  const byCompetitor = useMemo(() => new Map(roster.map((p) => [p.id, p])), [roster]);
   const containerW = Math.max(64, Number(width) || 0);
   const containerH = Math.max(32, Number(height) || 0);
   const unit = containerH / 216;
@@ -171,7 +172,7 @@ export default function BannerView({
   if (ranked.length === 0) {
     return (
       <div
-        className="bg-black flex items-center justify-center"
+        className="flex items-center justify-center"
         style={{
           width: containerW,
           height: containerH,
@@ -180,6 +181,7 @@ export default function BannerView({
           left: 0,
           overflow: "hidden",
           boxSizing: "border-box",
+          background: backgroundFor(look),
         }}
       >
         {showLogo ? (
@@ -191,8 +193,8 @@ export default function BannerView({
         ) : (
           <div
             style={{
-              color: "rgba(255,255,255,0.85)",
-              fontWeight: 800,
+              ...display,
+              color: look.colors.text,
               fontSize: Math.round(72 * unit),
               letterSpacing: "0.02em",
               textAlign: "center",
@@ -203,7 +205,7 @@ export default function BannerView({
           </div>
         )}
         <AnimatePresence>
-          {timerFrame && <LiveTimerOverlay frame={timerFrame} competitor={competitor} target={timerTarget} containerW={containerW} containerH={containerH} />}
+          {timerFrame && <LiveTimerOverlay frame={timerFrame} competitor={competitor} target={timerTarget} containerW={containerW} containerH={containerH} look={look} />}
         </AnimatePresence>
       </div>
     );
@@ -224,8 +226,8 @@ export default function BannerView({
         overflow: "hidden",
         padding: `0 ${padX}px`,
         boxSizing: "border-box",
-        background:
-          "radial-gradient(120% 100% at 0% 50%, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0) 60%), linear-gradient(180deg,#000,#0b0b0b)",
+        background: backgroundFor(look),
+        color: look.colors.text,
       }}
     >
       {showLogo && (
@@ -258,6 +260,8 @@ export default function BannerView({
               const displayRank = e.rank;
               const nameLineHeight = Math.round(nameSize * 1.06);
               const numberCircle = Math.round(70 * unit);
+              const hometown = look.showHometown ? byCompetitor.get(e.competitorId)?.hometown : "";
+              const beyondCut = look.cutLine > 0 && e.rank > look.cutLine;
 
               return (
                 <div key={e.id} className="min-w-0">
@@ -268,7 +272,8 @@ export default function BannerView({
                       alignItems: "center",
                       gap: sep,
                       padding: `${chipPY} ${chipPX}`,
-                      ...bannerCardStyle(unit),
+                      ...cardStyle(look, unit),
+                      opacity: beyondCut ? 0.75 : 1,
                       color: "#fff",
                       minWidth: 0,
                       width: "100%",
@@ -280,41 +285,58 @@ export default function BannerView({
                         height: numberCircle,
                         minWidth: numberCircle,
                         borderRadius: "9999px",
-                        background: rankBadgeBg(displayRank),
+                        ...rankBadge(look, displayRank),
                         display: "grid",
                         placeItems: "center",
-                        color: displayRank <= 3 ? "#111" : "#fff",
-                        fontWeight: 900,
+                        ...numbers,
                         fontSize: `${Math.round(50 * unit)}px`,
-                        boxShadow: "0 2px 10px rgba(0,0,0,0.35)",
                       }}
                       title={`Rang ${displayRank}`}
                     >
                       {displayRank}
                     </div>
 
-                    <div
-                      style={{
-                        fontSize: `${nameSize}px`,
-                        fontWeight: 900,
-                        lineHeight: `${nameLineHeight}px`,
-                        maxHeight: `${nameLineHeight * 2}px`,
-                        display: "-webkit-box",
-                        WebkitBoxOrient: "vertical",
-                        WebkitLineClamp: 2,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "normal",
-                        minWidth: 0,
-                      }}
-                      title={e.name}
-                    >
-                      {e.name.split(" ").map((part, i) => (
-                        <span key={i}>
-                          {part}
-                          {i < e.name.split(" ").length - 1 && <br />}
-                        </span>
-                      ))}
+                    <div style={{ minWidth: 0 }} title={e.name}>
+                      {/* Avec la ville : nom sur une ligne ; sinon un mot par ligne (2 max). */}
+                      <div
+                        style={{
+                          ...display,
+                          fontSize: `${nameSize}px`,
+                          lineHeight: `${nameLineHeight}px`,
+                          maxHeight: `${nameLineHeight * (hometown ? 1 : 2)}px`,
+                          display: "-webkit-box",
+                          WebkitBoxOrient: "vertical",
+                          WebkitLineClamp: hometown ? 1 : 2,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: hometown ? "nowrap" : "normal",
+                        }}
+                      >
+                        {hometown
+                          ? e.name
+                          : e.name.split(" ").map((part, i) => (
+                              <span key={i}>
+                                {part}
+                                {i < e.name.split(" ").length - 1 && <br />}
+                              </span>
+                            ))}
+                      </div>
+                      {hometown && (
+                        <div
+                          style={{
+                            fontSize: Math.round(nameSize * 0.5),
+                            lineHeight: 1.15,
+                            marginTop: Math.round(4 * unit),
+                            color: look.colors.muted,
+                            fontWeight: 600,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {hometown}
+                        </div>
+                      )}
                     </div>
 
                     <motion.div
@@ -323,8 +345,8 @@ export default function BannerView({
                       animate={{ scale: 1, opacity: 1 }}
                       transition={{ type: "spring", stiffness: 320, damping: 22 }}
                       style={{
+                        ...numbers,
                         fontSize: (scoreMode === "lower" || e.timeHint) ? Math.round(scoreSize * 0.82) : scoreSize,
-                        fontWeight: 900,
                         fontVariantNumeric: "tabular-nums lining-nums",
                         justifySelf: "end",
                         alignSelf: "center",
@@ -335,8 +357,8 @@ export default function BannerView({
                       }}
                     >
                       <span>{formatScore(e.parsed, entryDisplayMode(e, scoreMode))}</span>
-                      <span style={{ fontSize: `${Math.round(scoreSize * 0.35)}px`, opacity: 0.7 }}>
-                        {scoreMode === "lower" || e.timeHint ? "sec" : "pts"}
+                      <span style={{ fontSize: `${Math.round(scoreSize * 0.35)}px`, color: look.colors.muted, fontFamily: display.fontFamily, fontWeight: 700 }}>
+                        {scoreMode === "lower" || e.timeHint ? "s" : "pts"}
                       </span>
                     </motion.div>
                   </div>
@@ -348,7 +370,7 @@ export default function BannerView({
       </div>
 
       <AnimatePresence>
-        {timerFrame && <LiveTimerOverlay frame={timerFrame} competitor={competitor} target={timerTarget} containerW={containerW} containerH={containerH} />}
+        {timerFrame && <LiveTimerOverlay frame={timerFrame} competitor={competitor} target={timerTarget} containerW={containerW} containerH={containerH} look={look} />}
       </AnimatePresence>
 
       {/* Breaking news overlay */}
@@ -365,7 +387,7 @@ export default function BannerView({
               inset: 0,
               zIndex: 50,
               background: `
-                linear-gradient(180deg, rgba(0,0,0,0.85), rgba(0,0,0,0.85)),
+                linear-gradient(180deg, ${hexToRgba(look.colors.bg2, 0.92)}, ${hexToRgba(look.colors.bg2, 0.92)}),
                 repeating-linear-gradient(
                   -45deg,
                   rgba(255,255,255,0.04) 0px,
@@ -374,6 +396,7 @@ export default function BannerView({
                   transparent 12px
                 )
               `,
+              borderTop: `${Math.max(2, Math.round(6 * unit))}px solid ${look.colors.accent}`,
               display: "grid",
               gridTemplateColumns: "auto 1fr auto",
               alignItems: "center",
@@ -386,13 +409,11 @@ export default function BannerView({
                 width: Math.round(88 * unit),
                 height: Math.round(88 * unit),
                 borderRadius: 9999,
-                background: rankBadgeBg(breaking.rank),
+                ...rankBadge(look, breaking.rank),
                 display: "grid",
                 placeItems: "center",
-                color: breaking.rank <= 3 ? "#111" : "#fff",
-                fontWeight: 900,
+                ...numbers,
                 fontSize: Math.round(40 * unit),
-                boxShadow: "0 6px 22px rgba(0,0,0,0.45)",
               }}
               title={`Rang ${breaking.rank}`}
             >
@@ -402,8 +423,8 @@ export default function BannerView({
             <div style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: Math.round(24 * unit) }}>
               <div
                 style={{
+                  ...display,
                   fontSize: Math.round(66 * unit),
-                  fontWeight: 800,
                   lineHeight: `${Math.round(66 * unit * 1.06)}px`,
                   maxHeight: `${Math.round(66 * unit * 2 * 1.06)}px`,
                   display: "-webkit-box",
@@ -411,7 +432,7 @@ export default function BannerView({
                   WebkitLineClamp: 2,
                   overflow: "hidden",
                   textOverflow: "ellipsis",
-                  color: "#fff",
+                  color: look.colors.text,
                   letterSpacing: "-0.01em",
                 }}
                 title={breaking.name}
@@ -425,8 +446,8 @@ export default function BannerView({
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ type: "spring", stiffness: 320, damping: 22 }}
                 style={{
-                  fontWeight: 900,
-                  color: "#fff",
+                  ...numbers,
+                  color: look.colors.text,
                   fontVariantNumeric: "tabular-nums lining-nums",
                   whiteSpace: "nowrap",
                   display: "flex",
@@ -435,8 +456,8 @@ export default function BannerView({
                 }}
               >
                 <span style={{ fontSize: Math.round(92 * unit) }}>{breaking.scoreText}</span>
-                <span style={{ fontSize: Math.round(92 * unit * 0.35), opacity: 0.7, marginLeft: 2 }}>
-                  {(scoreMode === "lower" || ranked.find((r) => r.id === breaking.id)?.timeHint) ? "sec" : "pts"}
+                <span style={{ fontSize: Math.round(92 * unit * 0.35), color: look.colors.muted, marginLeft: 2, fontFamily: display.fontFamily, fontWeight: 700 }}>
+                  {(scoreMode === "lower" || ranked.find((r) => r.id === breaking.id)?.timeHint) ? "s" : "pts"}
                 </span>
               </motion.div>
             </div>

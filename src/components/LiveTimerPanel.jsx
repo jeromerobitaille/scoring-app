@@ -68,10 +68,10 @@ export default function LiveTimerPanel({
   return (
     <div
       className={
-        "flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border backdrop-blur px-4 py-3 transition-colors " +
+        "flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl px-4 py-3 transition-colors " +
         (armed && connected
-          ? "border-emerald-500/70 bg-emerald-50/70 dark:bg-emerald-950/30"
-          : "border-zinc-200 dark:border-zinc-800 bg-white/60 dark:bg-zinc-900/60")
+          ? "bg-emerald-500/10 ring-1 ring-emerald-500/40"
+          : "bg-zinc-500/5 ring-1 ring-zinc-500/15")
       }
     >
       <label

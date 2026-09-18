@@ -2,6 +2,7 @@ import React from "react";
 import useSyncedState from "../state/useSyncedState";
 import useFullscreenExit from "../hooks/useFullscreenExit";
 import BannerView from "../components/BannerView";
+import { getActive } from "../state/model";
 import { useOutputTimer, HOLD_TIME_MODE_MS, HOLD_SCORE_MODE_MS } from "../hooks/useLiveTimer";
 
 const FALLBACK_BANNER = {
@@ -9,6 +10,8 @@ const FALLBACK_BANNER = {
   nameScale: 1, scoreScale: 1,
   pageSize: 3, showLogo: true,
 };
+
+const activeRoster = (state) => getActive(state).competition.roster;
 
 export default function BannerDisplay() {
   useFullscreenExit();
@@ -39,6 +42,8 @@ export default function BannerDisplay() {
       competitor={state.bannerTimerShowName ? state.currentCompetitor : null}
       timerTarget={state.timerTarget}
       contextKey={`${state.currentRodeoId}:${state.currentDisciplineId}`}
+      look={state.look}
+      roster={activeRoster(state)}
       width={width}
       height={height}
     />

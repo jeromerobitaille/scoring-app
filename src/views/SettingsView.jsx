@@ -18,6 +18,7 @@ import {
   UserGroupIcon,
   AdjustmentsHorizontalIcon,
   ArchiveBoxIcon,
+  PaintBrushIcon,
 } from "@heroicons/react/24/outline";
 import { ArrowLeftIcon } from "@heroicons/react/24/solid";
 import ShareConnection from "../components/ShareConnection";
@@ -28,6 +29,7 @@ import { formatScore } from "../utils/score";
 import RodeosTab from "./settings/RodeosTab";
 import DisciplinesTab from "./settings/DisciplinesTab";
 import BackupTab from "./settings/BackupTab";
+import LookTab from "./settings/LookTab";
 
 function BannerPreview({ width, height }) {
   const w = Math.max(1, Number(width) || 0);
@@ -335,6 +337,19 @@ function TableTab({ state, push }) {
             />
             <span className="text-sm">Afficher le logo Festival Western</span>
           </label>
+
+          <label className="flex items-center gap-2 select-none cursor-pointer">
+            <input
+              type="checkbox"
+              checked={state.displayShowHero !== false}
+              onChange={(e) => push({ ...state, displayShowHero: e.target.checked })}
+              className="w-4 h-4"
+            />
+            <span className="text-sm">Bloc « sur le parcours » (compétiteur en cours, animal, chrono)</span>
+          </label>
+          <p className="text-[11px] opacity-60 -mt-2">
+            Couleurs, polices et ligne de coupure : onglet Apparence.
+          </p>
         </div>
 
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
@@ -917,6 +932,7 @@ function TimerTab({ state, push }) {
 const TABS = [
   { id: "rodeos",      label: "Rodéos",      icon: UserGroupIcon },
   { id: "disciplines", label: "Disciplines", icon: AdjustmentsHorizontalIcon },
+  { id: "look",   label: "Apparence", icon: PaintBrushIcon },
   { id: "qr",     label: "QR codes", icon: QrCodeIcon },
   { id: "banner", label: "Bandeau",  icon: TvIcon },
   { id: "canvas", label: "Canevas",  icon: Squares2X2Icon },
@@ -979,6 +995,7 @@ export default function SettingsView() {
 
         {active === "rodeos"      && <RodeosTab state={state} push={push} />}
         {active === "disciplines" && <DisciplinesTab state={state} push={push} />}
+        {active === "look"   && <LookTab state={state} push={push} />}
         {active === "qr"     && <QrTab />}
         {active === "banner" && <BannerTab state={state} push={push} />}
         {active === "canvas" && <CanvasTab state={state} push={push} />}

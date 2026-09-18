@@ -37,7 +37,20 @@ const FONTS = {
     timeWeight: "normal",
     fixedDigits: true,
   },
+  // Texas Tango (texas_tango.otf) : chiffres à chasse fixe 0.681 em, capitales 0.74 em.
+  texasTango: {
+    family: "'TexasTango', 'Impact', sans-serif",
+    digit: 0.681,
+    separator: 0.319,
+    char: 0.73,
+    capHeight: 0.74,
+    capShift: 0.06,
+    nameWeight: "normal",
+    timeWeight: "normal",
+    fixedDigits: false,
+  },
 };
+
 
 const isDigit = (c) => c >= "0" && c <= "9";
 
@@ -61,6 +74,8 @@ export default function TimerDisplay({
   scale = 1,
   font = "default",
   target = null,
+  color = "#fff",
+  targetColor = TARGET_REACHED_COLOR,
 }) {
   const m = FONTS[font] ?? FONTS.default;
   const text = formatScore(seconds, "time");
@@ -104,7 +119,7 @@ export default function TimerDisplay({
         gap,
         padding: `0 ${padding}px`,
         boxSizing: "border-box",
-        color: "#fff",
+        color,
         fontFamily: m.family,
       }}
     >
@@ -133,7 +148,7 @@ export default function TimerDisplay({
           transform: shift,
           whiteSpace: "nowrap",
           flexShrink: 0,
-          color: targetReached(seconds, target) ? TARGET_REACHED_COLOR : undefined,
+          color: targetReached(seconds, target) ? targetColor : undefined,
           transition: "color 0.2s",
         }}
       >
