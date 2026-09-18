@@ -63,7 +63,7 @@ function ElementView({ el, ctx }) {
  * liste (le dernier est au-dessus). Purement présentationnel ; sert à la
  * sortie plein écran comme aux aperçus de l'éditeur.
  */
-export default function OutputStage({ output, ctx, background }) {
+export default function OutputStage({ output, ctx, background, elements = output.elements }) {
   return (
     <div
       style={{
@@ -76,7 +76,7 @@ export default function OutputStage({ output, ctx, background }) {
         background: backgroundCss(background ?? output.background, ctx.look),
       }}
     >
-      {output.elements.map((el) => (
+      {elements.map((el) => (
         <ElementView key={el.id} el={el} ctx={ctx} />
       ))}
     </div>

@@ -3,7 +3,7 @@ import useSyncedState from "../state/useSyncedState";
 import useFullscreenExit from "../hooks/useFullscreenExit";
 import OutputStage from "../components/outputs/OutputStage";
 import { backgroundCss, buildContext } from "../state/context";
-import { findLegacyOutput } from "../state/outputs";
+import { elementsFor, findLegacyOutput } from "../state/outputs";
 import { useOutputTimer, HOLD_TIME_MODE_MS, HOLD_SCORE_MODE_MS } from "../hooks/useLiveTimer";
 
 function useWindowSize() {
@@ -75,14 +75,15 @@ export default function OutputView() {
     );
   }
 
+  const elements = elementsFor(output, state.currentDisciplineId);
   const scale = Math.min(winW / output.width, winH / output.height) || 1;
   const left = Math.round((winW - output.width * scale) / 2);
   const top = Math.round((winH - output.height * scale) / 2);
 
   return (
     <div style={{ position: "absolute", left, top, width: output.width, height: output.height, transform: `scale(${scale})`, transformOrigin: "top left" }}>
-      <OutputStage output={output} ctx={ctx} />
-      {output.elements.length === 0 && (
+      <OutputStage output={output} ctx={ctx} elements={elements} />
+      {elements.length === 0 && (
         <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "rgba(255,255,255,0.4)", fontSize: Math.round(Math.min(output.width, output.height) * 0.04), pointerEvents: "none" }}>
           Sortie vide — ajoutez des éléments dans Paramètres → Éditeur.
         </div>

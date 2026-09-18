@@ -37,6 +37,7 @@ export default function OutputsTab({ state }) {
               <div className="font-medium truncate">{o.name}</div>
               <div className="text-xs opacity-60 tabular-nums">
                 {o.width} × {o.height} px · {o.elements.length} élément{o.elements.length > 1 ? "s" : ""} · fond : {BACKGROUNDS[o.background]?.label ?? o.background}
+                {Object.keys(o.variants ?? {}).length > 0 && <> · modèles propres : {Object.keys(o.variants).map((id) => state.disciplines.find((d) => d.id === id)?.name ?? "?").join(", ")}</>}
               </div>
             </div>
             <button type="button" onClick={() => openEditor(o.id)} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer">

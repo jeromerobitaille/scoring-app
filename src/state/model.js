@@ -174,7 +174,7 @@ export function normalizeState(input) {
 
   // Anciens réglages d'affichage (bandeaux, canevas, tableau) : convertis en
   // sorties une fois, puis retirés de l'état.
-  const outputs = normalizeOutputs(state);
+  const outputs = normalizeOutputs(state, disciplineIds);
   const rest = { ...state };
   for (const k of LEGACY_STATE_KEYS) delete rest[k];
 

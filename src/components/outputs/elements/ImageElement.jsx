@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { resolveImageSrc } from "../../../state/assets";
+import { cropLayout, useNaturalSize } from "./imageCrop";
 
 const keyedCache = new Map();
 
@@ -54,13 +55,22 @@ function useKeyedImage(src, keyColor, tolerance) {
 
 export default function ImageElement({ el }) {
   const url = useKeyedImage(resolveImageSrc(el.src), el.keyColor, el.keyTolerance);
+  const natural = useNaturalSize(el.crop ? url : null);
   if (!url) return null;
+  if (!el.crop) {
+    return (
+      <img
+        src={url}
+        alt=""
+        draggable={false}
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: el.fit, pointerEvents: "none" }}
+      />
+    );
+  }
+  const { box, img } = cropLayout(el, natural);
   return (
-    <img
-      src={url}
-      alt=""
-      draggable={false}
-      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: el.fit, pointerEvents: "none" }}
-    />
+    <div style={{ position: "absolute", ...box, overflow: "hidden" }}>
+      <img src={url} alt="" draggable={false} style={{ position: "absolute", ...img, maxWidth: "none", pointerEvents: "none" }} />
+    </div>
   );
 }

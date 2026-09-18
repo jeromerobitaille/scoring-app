@@ -5,6 +5,7 @@ import { VARIABLES } from "../../../state/bindings";
 import { ELEMENT_KINDS, OUTPUT_STATES } from "../../../state/outputs";
 import { ASSETS } from "../../../state/assets";
 import { BTN, BTN_DANGER, ColorSelect, Field, INPUT, NumberField, SMALL, Section, SelectField, Slider, Toggle } from "./inputs";
+import CropEditor from "./CropEditor";
 
 const FONT_OPTIONS = Object.entries(FONTS).map(([k, f]) => [k, f.label]);
 const ALIGN_OPTIONS = [["left", "Gauche"], ["center", "Centré"], ["right", "Droite"]];
@@ -64,18 +65,11 @@ function TextProps({ el, set }) {
   );
 }
 
-function ImageProps({ el, set, onPickImage, uploading }) {
+function ImageProps({ el, set, onPickImage, uploading, onMove }) {
   const isAsset = el.src.startsWith("asset:");
   return (
     <Section title="Image">
       <div className="space-y-3">
-        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-2 bg-[repeating-conic-gradient(#8883_0%_25%,transparent_0%_50%)] bg-[length:16px_16px]">
-          {el.src ? (
-            <img src={isAsset ? ASSETS[el.src.slice(6)]?.url : el.src} alt="" className="w-full h-auto max-h-40 object-contain rounded-md" />
-          ) : (
-            <div className="text-xs opacity-60 italic p-3 text-center">Aucune image</div>
-          )}
-        </div>
         <div className="space-y-2">
           <div className="grid grid-cols-2 gap-2">
             <SelectField
@@ -100,6 +94,9 @@ function ImageProps({ el, set, onPickImage, uploading }) {
           )}
         </div>
       </div>
+      <Section title="Recadrage">
+        <CropEditor el={el} onChange={set} onFitHeight={(h) => onMove(el.id, { height: h })} />
+      </Section>
     </Section>
   );
 }
@@ -238,7 +235,7 @@ export default function ElementProperties({ el, output, onChange, onMove, onDupl
         </div>
       </Section>
 
-      {Props && <Props el={el} set={set} onPickImage={onPickImage} uploading={uploading} />}
+      {Props && <Props el={el} set={set} onPickImage={onPickImage} uploading={uploading} onMove={onMove} />}
 
       <div className="flex gap-2 pt-3 border-t border-zinc-200 dark:border-zinc-800">
         <button type="button" onClick={() => onDuplicate(el.id)} className={BTN}><DocumentDuplicateIcon className="w-3.5 h-3.5" /> Dupliquer</button>

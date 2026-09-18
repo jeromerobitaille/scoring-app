@@ -2,7 +2,11 @@
  * Sorties (tableau, bandeaux LED, canevas OBS…) : chaque sortie est une scène
  * de taille fixe composée d'éléments positionnés librement dans l'éditeur.
  *
- *   output = { id, name, width, height, background, legacy, elements: [Element] }
+ *   output = { id, name, width, height, background, legacy, elements: [Element],
+ *              variants: { [disciplineId]: [Element] } }
+ *     elements    modèle par défaut, utilisé par toutes les disciplines
+ *     variants    modèle propre à une discipline (copie modifiée du défaut ou
+ *                 d'une autre discipline) ; voir elementsFor()
  *     background  "black" | "green" | "blue" | "transparent" | "look" (dégradé du thème) | "#rrggbb"
  *     legacy      "display" | "banner:0" | "banner:1" | "canvas" | null — ancienne
  *                 adresse (?display=1, ?banner=1&bid=0, ?canvas=1) qui ouvre cette sortie
@@ -102,6 +106,7 @@ export const ELEMENT_KINDS = {
       fit: "contain",
       keyColor: null,
       keyTolerance: 0.35,
+      crop: null, // { x, y, w, h } en fraction de l'image source (null = entière)
     },
   },
   card: {
@@ -177,6 +182,18 @@ const bool = (v, fb) => (v === undefined || v === null ? fb : Boolean(v));
 const oneOf = (v, list, fb) => (list.includes(v) ? v : fb);
 const str = (v, fb, max = 200) => (typeof v === "string" ? v.slice(0, max) : fb);
 
+/** Recadrage en fractions de l'image : null si vide ou équivalent à l'image entière. */
+export function normalizeCrop(c) {
+  if (!c || typeof c !== "object") return null;
+  const w = num(c.w, 1, 0.01, 1);
+  const h = num(c.h, 1, 0.01, 1);
+  const x = num(c.x, 0, 0, 1 - w);
+  const y = num(c.y, 0, 0, 1 - h);
+  if (x === 0 && y === 0 && w === 1 && h === 1) return null;
+  const r = (v) => Math.round(v * 10000) / 10000;
+  return { x: r(x), y: r(y), w: r(w), h: r(h) };
+}
+
 export const newId = (prefix = "el") => `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 
 /** Couleur de texte : hexa ou clé du thème. */
@@ -241,6 +258,7 @@ export function normalizeElement(src, output) {
         fit: oneOf(src.fit, ["contain", "cover", "fill"], d.fit),
         keyColor: hex(src.keyColor, null),
         keyTolerance: num(src.keyTolerance, d.keyTolerance, 0.05, 0.8),
+        crop: normalizeCrop(src.crop),
       };
     case "card":
       return {
@@ -302,12 +320,18 @@ export function normalizeBackground(bg, fallback = "black") {
 
 const LEGACY_KEYS = /^(display|canvas|banner:\d)$/;
 
-export function normalizeOutput(src) {
+export function normalizeOutput(src, disciplineIds = null) {
   if (!src || typeof src !== "object") return null;
   const width = Math.round(num(src.width, 1920, 64, 8192));
   const height = Math.round(num(src.height, 1080, 32, 8192));
   const out = { width, height };
-  const elements = Array.isArray(src.elements) ? src.elements.map((e) => normalizeElement(e, out)).filter(Boolean) : [];
+  const list = (v) => (Array.isArray(v) ? v.map((e) => normalizeElement(e, out)).filter(Boolean) : []);
+  const variants = {};
+  if (src.variants && typeof src.variants === "object") {
+    for (const [k, v] of Object.entries(src.variants)) {
+      if (Array.isArray(v) && (!disciplineIds || disciplineIds.has(k))) variants[k] = list(v);
+    }
+  }
   return {
     id: typeof src.id === "string" && src.id ? src.id : newId("out"),
     name: str(src.name, "", 60) || "Sortie",
@@ -315,8 +339,19 @@ export function normalizeOutput(src) {
     height,
     background: normalizeBackground(src.background),
     legacy: typeof src.legacy === "string" && LEGACY_KEYS.test(src.legacy) ? src.legacy : null,
-    elements,
+    elements: list(src.elements),
+    variants,
   };
+}
+
+/** Éléments à rendre pour une discipline : son modèle, sinon le modèle par défaut. */
+export function elementsFor(output, disciplineId) {
+  return (disciplineId && output.variants?.[disciplineId]) ?? output.elements;
+}
+
+/** Copie d'une liste d'éléments avec de nouveaux ids. */
+export function cloneElements(elements) {
+  return elements.map((e) => ({ ...e, id: newId() }));
 }
 
 // ── Sorties par défaut / migration des anciens réglages ─────────────────────
@@ -474,9 +509,9 @@ export function legacyOutputs(state = {}) {
 }
 
 /** Liste de sorties validée ; construite depuis les anciens réglages si absente. */
-export function normalizeOutputs(state) {
+export function normalizeOutputs(state, disciplineIds = null) {
   if (Array.isArray(state?.outputs)) {
-    const list = state.outputs.map(normalizeOutput).filter(Boolean);
+    const list = state.outputs.map((o) => normalizeOutput(o, disciplineIds)).filter(Boolean);
     if (list.length) return list;
   }
   return legacyOutputs(state);

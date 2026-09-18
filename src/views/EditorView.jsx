@@ -25,7 +25,8 @@ import ThemeToggle from "../components/ui/ThemeToggle";
 import { bus } from "../sync/SyncBus";
 import { buildContext, isElementShown, outputStateOf } from "../state/context";
 import { computeRanking } from "../utils/score";
-import { BACKGROUNDS, ELEMENT_KINDS, OUTPUT_STATES, SIZE_PRESETS, createElement, newId, normalizeOutput } from "../state/outputs";
+import { BACKGROUNDS, ELEMENT_KINDS, OUTPUT_STATES, SIZE_PRESETS, cloneElements, createElement, newId, normalizeOutput } from "../state/outputs";
+import { normalizeState } from "../state/model";
 import { SAMPLE_ENTRIES, SAMPLE_ROSTER, SAMPLE_TIMER } from "../state/sample";
 import { uploadImage } from "../state/media";
 import { useOutputTimer, HOLD_TIME_MODE_MS, HOLD_SCORE_MODE_MS } from "../hooks/useLiveTimer";
@@ -65,7 +66,7 @@ function inState(el, ctx) {
 }
 
 /** Scène à l'échelle de l'espace disponible ; les éléments se déplacent à la souris, poignée pour la taille. */
-function Stage({ output, ctx, selectedId, onSelect, onMove, onNudge, onDelete }) {
+function Stage({ output, elements, ctx, selectedId, onSelect, onMove, onNudge, onDelete }) {
   const wrapRef = useRef(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   useEffect(() => {
@@ -127,9 +128,9 @@ function Stage({ output, ctx, selectedId, onSelect, onMove, onNudge, onDelete })
         onMouseDown={(e) => { e.stopPropagation(); onSelect(null); }}
       >
         <div style={{ width: output.width, height: output.height, transform: `scale(${scale})`, transformOrigin: "top left", position: "absolute", top: 0, left: 0, pointerEvents: "none" }}>
-          <OutputStage output={output} ctx={ctx} />
+          <OutputStage output={output} ctx={ctx} elements={elements} />
         </div>
-        {output.elements.filter((el) => inState(el, ctx)).map((el) => {
+        {elements.filter((el) => inState(el, ctx)).map((el) => {
           const sel = el.id === selectedId;
           return (
             <div
@@ -166,11 +167,55 @@ function Stage({ output, ctx, selectedId, onSelect, onMove, onNudge, onDelete })
 }
 
 /** Propriétés de la sortie (quand aucun élément n'est sélectionné). */
-function OutputProperties({ output, outputs, onChange, onDuplicate, onRemove, onCopyUrl, copied, state }) {
+function OutputProperties({ output, outputs, onChange, onDuplicate, onRemove, onCopyUrl, copied, state, templates }) {
   const presetIndex = SIZE_PRESETS.findIndex((p) => p.width === output.width && p.height === output.height);
   const isCustomBg = !(output.background in BACKGROUNDS);
+  const { variantId, usingDefault, disciplines, copyFrom, copyTo, resetVariant } = templates;
+  const current = disciplines.find((d) => d.id === variantId);
+  const customized = disciplines.filter((d) => output.variants[d.id]);
+  const label = (id) => (id ? disciplines.find((d) => d.id === id)?.name ?? "?" : "Modèle par défaut");
   return (
     <div className="space-y-4">
+      <Section title="Modèle par discipline">
+        <div className="text-xs">
+          {variantId ? (
+            usingDefault ? (
+              <>
+                <b>{current?.name}</b> utilise le modèle par défaut. Toute modification créera un modèle propre à cette discipline.
+              </>
+            ) : (
+              <>
+                Modèle propre à <b>{current?.name}</b>.
+              </>
+            )
+          ) : (
+            <>
+              Modèle par défaut, utilisé par les disciplines sans modèle propre
+              {customized.length > 0 && <> (personnalisé pour : {customized.map((d) => d.name).join(", ")})</>}.
+            </>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Copier depuis…">
+            <select className={SMALL} value="" onChange={(e) => { if (e.target.value !== "") copyFrom(e.target.value === "default" ? "" : e.target.value); }}>
+              <option value="">Choisir…</option>
+              {variantId && <option value="default">Modèle par défaut</option>}
+              {customized.filter((d) => d.id !== variantId).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Copier vers…">
+            <select className={SMALL} value="" onChange={(e) => { if (e.target.value !== "") copyTo(e.target.value === "default" ? "" : e.target.value); }}>
+              <option value="">Choisir…</option>
+              {variantId && <option value="default">Modèle par défaut</option>}
+              {disciplines.filter((d) => d.id !== variantId).map((d) => <option key={d.id} value={d.id}>{d.name}{output.variants[d.id] ? " •" : ""}</option>)}
+            </select>
+          </Field>
+        </div>
+        {variantId && !usingDefault && (
+          <button type="button" onClick={resetVariant} className={BTN_DANGER}><TrashIcon className="w-3.5 h-3.5" /> Revenir au modèle par défaut pour {label(variantId)}</button>
+        )}
+        <p className="text-[11px] opacity-60">Le point (•) marque une discipline qui a déjà son propre modèle.</p>
+      </Section>
       <div>
         <input
           type="text"
@@ -234,6 +279,7 @@ export default function EditorView() {
   const [outputId, setOutputId] = useState(() => new URLSearchParams(window.location.search).get("output") || outputs[0]?.id || null);
   const output = outputs.find((o) => o.id === outputId) ?? outputs[0] ?? null;
   const [selectedId, setSelectedId] = useState(null);
+  const [variantId, setVariantId] = useState(""); // "" = modèle par défaut, sinon id de discipline
   const [sim, setSim] = useState("auto");
   const [useSample, setUseSample] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -250,7 +296,12 @@ export default function EditorView() {
     pendingRun: state.pendingRun,
     holdMs: state.scoreMode === "lower" ? HOLD_TIME_MODE_MS : HOLD_SCORE_MODE_MS,
   });
-  const ctx = useMemo(() => previewContext(state, liveFrame, sim, useSample), [state, liveFrame, sim, useSample]);
+  // Aperçu dans le contexte de la discipline dont on édite le modèle.
+  const previewState = useMemo(
+    () => (variantId && variantId !== state.currentDisciplineId ? normalizeState({ ...state, currentDisciplineId: variantId }) : state),
+    [state, variantId]
+  );
+  const ctx = useMemo(() => previewContext(previewState, liveFrame, sim, useSample), [previewState, liveFrame, sim, useSample]);
 
   useEffect(() => {
     if (output && output.id !== outputId) setOutputId(output.id);
@@ -260,6 +311,7 @@ export default function EditorView() {
   const setOutputs = (next) => push({ ...state, outputs: next });
   const updateOutput = (patch) => setOutputs(outputs.map((o) => (o.id === output.id ? { ...o, ...patch } : o)));
   const selectOutput = (id) => { setOutputId(id); setSelectedId(null); };
+  const selectVariant = (id) => { setVariantId(id); setSelectedId(null); };
   const addOutput = (src) => {
     const created = normalizeOutput({ ...src, id: newId("out"), legacy: null });
     setOutputs([...outputs, created]);
@@ -275,12 +327,46 @@ export default function EditorView() {
     selectOutput(next[0].id);
   };
 
-  // ── Éléments ─────────────────────────────────────────────────────────
-  const elements = output?.elements ?? [];
+  // ── Modèles par discipline ───────────────────────────────────────────
+  const disciplines = state.disciplines;
+  const variant = variantId ? output?.variants?.[variantId] : undefined;
+  const usingDefault = !!variantId && !variant;
+  const elements = variant ?? output?.elements ?? [];
   const visibleElements = elements.filter((e) => inState(e, ctx));
   const hiddenCount = elements.length - visibleElements.length;
   const selected = visibleElements.find((e) => e.id === selectedId) ?? null;
-  const setElements = (next) => updateOutput({ elements: next });
+  // Écriture : dans le modèle de la discipline (créé à la première modification), sinon dans le défaut.
+  const setElements = (next) =>
+    variantId ? updateOutput({ variants: { ...output.variants, [variantId]: next } }) : updateOutput({ elements: next });
+  const templates = {
+    variantId,
+    usingDefault,
+    disciplines,
+    copyFrom: (sourceId) => {
+      const src = sourceId ? output.variants[sourceId] : output.elements;
+      if (!src) return;
+      const name = sourceId ? disciplines.find((d) => d.id === sourceId)?.name : "le modèle par défaut";
+      if (!window.confirm(`Remplacer le modèle en cours par une copie de ${name} ?`)) return;
+      setElements(cloneElements(src));
+      setSelectedId(null);
+    },
+    copyTo: (targetId) => {
+      const name = targetId ? disciplines.find((d) => d.id === targetId)?.name : "le modèle par défaut";
+      const exists = targetId ? !!output.variants[targetId] : true;
+      if (exists && !window.confirm(`Remplacer le modèle de ${name} par une copie de celui-ci ?`)) return;
+      const copy = cloneElements(elements);
+      if (targetId) updateOutput({ variants: { ...output.variants, [targetId]: copy } });
+      else updateOutput({ elements: copy });
+      selectVariant(targetId);
+    },
+    resetVariant: () => {
+      if (!variantId || !window.confirm("Supprimer le modèle propre à cette discipline ? Elle reprendra le modèle par défaut.")) return;
+      const { [variantId]: _gone, ...rest } = output.variants;
+      void _gone;
+      updateOutput({ variants: rest });
+      setSelectedId(null);
+    },
+  };
   const updateEl = (id, patch) => setElements(elements.map((e) => (e.id === id ? { ...e, ...patch } : e)));
   const moveEl = (id, patch) => {
     const el = elements.find((e) => e.id === id);
@@ -409,6 +495,20 @@ export default function EditorView() {
         </div>
 
         <div className="flex items-center gap-3 text-xs flex-shrink-0">
+          <label className="flex items-center gap-1.5">
+            <span className="opacity-60 hidden lg:inline">Modèle</span>
+            <select
+              className={`${SMALL} !w-auto max-w-[220px]`}
+              value={variantId}
+              onChange={(e) => selectVariant(e.target.value)}
+              title="Modèle par défaut ou modèle propre à une discipline"
+            >
+              <option value="">Par défaut (toutes les disciplines)</option>
+              {disciplines.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}{output.variants[d.id] ? " •" : ""}</option>
+              ))}
+            </select>
+          </label>
           <span className="opacity-60 hidden lg:inline">Aperçu</span>
           <div className="inline-flex rounded-lg border border-zinc-300 dark:border-zinc-700 overflow-hidden">
             {[["auto", "Réel"], ...OUTPUT_STATES.map((s) => [s.key, s.label])].map(([k, l]) => (
@@ -492,7 +592,14 @@ export default function EditorView() {
 
         {/* Centre : scène */}
         <main className="flex-1 min-w-0 relative bg-zinc-200 dark:bg-black">
-          <Stage output={output} ctx={ctx} selectedId={selectedId} onSelect={setSelectedId} onMove={moveEl} onNudge={nudge} onDelete={removeEl} />
+          <Stage output={output} elements={elements} ctx={ctx} selectedId={selectedId} onSelect={setSelectedId} onMove={moveEl} onNudge={nudge} onDelete={removeEl} />
+          {variantId && (
+            <div className={`absolute left-3 top-2 text-[11px] px-2 py-1 rounded-lg pointer-events-none ${usingDefault ? "bg-amber-400/90 text-black" : "bg-sky-500/90 text-white"}`}>
+              {usingDefault
+                ? `${disciplines.find((d) => d.id === variantId)?.name} : modèle par défaut — modifier crée un modèle propre à cette discipline`
+                : `Modèle propre à ${disciplines.find((d) => d.id === variantId)?.name}`}
+            </div>
+          )}
           <div className="absolute left-3 bottom-2 text-[11px] opacity-60 tabular-nums pointer-events-none">
             {output.width}×{output.height} px · état : {OUTPUT_STATES.find((s) => s.key === ctx.outputState)?.label} · glisser pour déplacer, coin pour la taille, flèches pour ajuster (Maj = 10 px), Suppr pour retirer
           </div>
@@ -522,6 +629,7 @@ export default function EditorView() {
               onRemove={removeOutput}
               onCopyUrl={copyUrl}
               copied={copied}
+              templates={templates}
             />
           )}
         </aside>
