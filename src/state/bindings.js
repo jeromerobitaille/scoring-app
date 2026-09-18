@@ -1,4 +1,4 @@
-import { formatScore, entryDisplayMode } from "../utils/score";
+import { formatScore, entryDisplayMode } from "../utils/score.js";
 
 /**
  * Sources de texte d'un champ d'infographie. Chaque champ = { source, text }
@@ -21,6 +21,9 @@ export const BINDINGS = [
   { key: "leader", label: "Meneur — nom" },
   { key: "leader.result", label: "Meneur — résultat" },
   { key: "competitor.rank", label: "Rang du compétiteur (ex. 3e)" },
+  { key: "scoreModeLabel", label: "Mode (« Temps — le plus bas gagne »)" },
+  { key: "unit", label: "Unité (s / pts)" },
+  { key: "count", label: "Nombre de résultats" },
 ];
 
 export const BINDING_KEYS = new Set(BINDINGS.map((b) => b.key));
@@ -69,6 +72,9 @@ export function resolveField(field, ctx) {
     case "rodeo": return wrap(ctx.rodeoName);
     case "leader": return wrap(ctx.ranked[0]?.name);
     case "leader.result": return wrap(fmt(ctx.ranked[0]));
+    case "scoreModeLabel": return wrap(ctx.scoreMode === "lower" ? "Temps — le plus bas gagne" : "Pointage — le plus haut gagne");
+    case "unit": return wrap(ctx.scoreMode === "lower" ? "s" : "pts");
+    case "count": return wrap(ctx.ranked.length ? String(ctx.ranked.length) : "");
     default: return "";
   }
 }

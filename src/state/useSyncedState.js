@@ -2,214 +2,25 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import LocalSocket from "../sync/LocalSocket";
 import { bus } from "../sync/SyncBus";
 import { normalizeState } from "./model";
-import { FONTS } from "./look";
 
 const LS_KEY = "rodeo-scoring-state-v1";
 function loadState() { try { return JSON.parse(localStorage.getItem(LS_KEY)) || null; } catch { return null; } }
 function saveState(state) { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch {} }
-
-export const DEFAULT_BANNERS = [
-  {
-    id: "primary",
-    label: "Bandeau principal",
-    width: 2592,
-    height: 216,
-    nameScale: 1.0,
-    scoreScale: 1.0,
-    pageSize: 3,
-    showLogo: true,
-  },
-  {
-    id: "secondary",
-    label: "Bandeau secondaire",
-    width: 1920,
-    height: 144,
-    nameScale: 1.0,
-    scoreScale: 1.0,
-    pageSize: 2,
-    showLogo: true,
-  },
-];
-
-export const DEFAULT_CANVAS = {
-  width: 1920,
-  height: 1080,
-  background: "black", // black | green | blue | transparent | #rrggbb
-  banners: [], // éléments (bandeaux, chrono, infographies) ajoutés dans l'éditeur
-};
-
-export const GRAPHIC_LAYER_DEFAULTS = {
-  text: "{competitor.name}",
-  x: 40,
-  y: 40,
-  width: 600,
-  height: 80,
-  font: "timmons",
-  size: 56,
-  color: "#ffffff",
-  align: "left",
-  valign: "middle",
-  bold: false,
-  uppercase: false,
-  shadow: false,
-  letterSpacing: 0,
-};
-
-const HEX = /^#[0-9a-f]{6}$/i;
-const hex = (v, fallback) => (typeof v === "string" && HEX.test(v) ? v.toLowerCase() : fallback);
 
 const DEFAULT_STATE = {
   eventName: "Rodeo",
   scoreMode: "higher",
   entries: [],
   theme: "dark",
-  banners: DEFAULT_BANNERS,
-  canvas: DEFAULT_CANVAS,
-  // Tableau plein écran
-  displayPageSize: 5,           // entries per page (1–10)
-  displayRotationMs: 5000,      // ms between auto-rotations; 0 disables rotation
-  displayShowPagination: true,  // show the dot indicators
-  showDisplayLogo: true,        // hide the FWST logo on the fullscreen leaderboard
-  showLiveTimer: true,          // live FarmTek time on the outputs (time mode only)
-  bannerTimerShowName: false,   // competitor name next to the live time on LED banners
+  showLiveTimer: true, // chrono FarmTek en direct sur les sorties (quand il est armé)
 };
-
-function normalizeBanner(src, fallback) {
-  return {
-    id: src?.id ?? fallback.id,
-    label: src?.label ?? fallback.label,
-    width: Math.max(320, Number(src?.width ?? fallback.width) || fallback.width),
-    height: Math.max(64, Number(src?.height ?? fallback.height) || fallback.height),
-    nameScale: Math.min(2, Math.max(0.6, Number(src?.nameScale ?? fallback.nameScale))),
-    scoreScale: Math.min(2, Math.max(0.6, Number(src?.scoreScale ?? fallback.scoreScale))),
-    pageSize: Math.min(6, Math.max(1, Number(src?.pageSize ?? fallback.pageSize))),
-    showLogo: src?.showLogo ?? fallback.showLogo,
-  };
-}
-
-const TIMER_ALIGNS = ["left", "center", "right"];
-
-const LAYER_ALIGNS = ["left", "center", "right"];
-const LAYER_VALIGNS = ["top", "middle", "bottom"];
-
-function normalizeGraphicLayer(src) {
-  if (!src || typeof src !== "object") return null;
-  const d = GRAPHIC_LAYER_DEFAULTS;
-  const num = (v, fb, min, max) => {
-    const n = Number(v);
-    return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fb;
-  };
-  return {
-    id: src.id ?? `l-${Math.random().toString(36).slice(2, 8)}`,
-    text: String(src.text ?? d.text).slice(0, 200),
-    x: num(src.x, d.x, -4000, 8000),
-    y: num(src.y, d.y, -4000, 8000),
-    width: num(src.width, d.width, 8, 8000),
-    height: num(src.height, d.height, 8, 4000),
-    font: src.font in FONTS ? src.font : d.font,
-    size: num(src.size, d.size, 6, 600),
-    color: hex(src.color, d.color),
-    align: LAYER_ALIGNS.includes(src.align) ? src.align : d.align,
-    valign: LAYER_VALIGNS.includes(src.valign) ? src.valign : d.valign,
-    bold: Boolean(src.bold),
-    uppercase: Boolean(src.uppercase),
-    shadow: Boolean(src.shadow),
-    letterSpacing: num(src.letterSpacing, 0, -0.1, 1),
-  };
-}
-
-function normalizeCanvasBanner(src, canvasW, canvasH) {
-  const w = Math.max(64, Math.min(canvasW, Number(src?.width) || 1920));
-  const h = Math.max(32, Math.min(canvasH, Number(src?.height) || 216));
-  const base = {
-    id: src?.id ?? `c-${Math.random().toString(36).slice(2, 8)}`,
-    x: Math.max(0, Math.min(canvasW - w, Number(src?.x) || 0)),
-    y: Math.max(0, Math.min(canvasH - h, Number(src?.y) || 0)),
-    width: w,
-    height: h,
-  };
-  if (src?.kind === "graphic") {
-    const layers = Array.isArray(src.layers) ? src.layers.map(normalizeGraphicLayer).filter(Boolean) : [];
-    const tol = Number(src.keyTolerance);
-    return {
-      ...base,
-      kind: "graphic",
-      label: src?.label ?? "Infographie",
-      image: typeof src.image === "string" ? src.image.slice(0, 2000) : "",
-      keyColor: hex(src.keyColor, null),
-      keyTolerance: Number.isFinite(tol) ? Math.min(0.8, Math.max(0.05, tol)) : 0.35,
-      hideWhenEmpty: src.hideWhenEmpty ?? true,
-      animate: src.animate ?? true,
-      layers,
-    };
-  }
-  if (src?.kind === "timer") {
-    return {
-      ...base,
-      kind: "timer",
-      label: src?.label ?? "Chrono",
-      showName: Boolean(src?.showName),
-      align: TIMER_ALIGNS.includes(src?.align) ? src.align : "center",
-      timeScale: Math.min(1.5, Math.max(0.5, Number(src?.timeScale ?? 1))),
-    };
-  }
-  return {
-    ...base,
-    kind: "banner",
-    label: src?.label ?? "Bandeau",
-    nameScale: Math.min(2, Math.max(0.6, Number(src?.nameScale ?? 1))),
-    scoreScale: Math.min(2, Math.max(0.6, Number(src?.scoreScale ?? 1))),
-    pageSize: Math.min(6, Math.max(1, Number(src?.pageSize ?? 3))),
-    showLogo: src?.showLogo ?? true,
-  };
-}
-
-function migrateCanvas(saved) {
-  const src = saved.canvas ?? DEFAULT_CANVAS;
-  const width = Math.max(320, Number(src.width) || DEFAULT_CANVAS.width);
-  const height = Math.max(64, Number(src.height) || DEFAULT_CANVAS.height);
-  const banners = Array.isArray(src.banners)
-    ? src.banners.filter((b) => b?.kind !== "lowerThird").map((b) => normalizeCanvasBanner(b, width, height))
-    : [];
-  const bg = typeof src.background === "string" ? src.background : DEFAULT_CANVAS.background;
-  const background = ["black", "green", "blue", "transparent"].includes(bg) ? bg : hex(bg, "black");
-  return { width, height, background, banners };
-}
-
-function migrateBanners(saved) {
-  if (Array.isArray(saved.banners) && saved.banners.length >= 1) {
-    return [
-      normalizeBanner(saved.banners[0], DEFAULT_BANNERS[0]),
-      normalizeBanner(saved.banners[1] ?? DEFAULT_BANNERS[1], DEFAULT_BANNERS[1]),
-    ];
-  }
-  // Legacy: build banners[0] from the old flat fields
-  const legacyPrimary = {
-    ...DEFAULT_BANNERS[0],
-    width: saved.bannerWidth ?? DEFAULT_BANNERS[0].width,
-    height: saved.bannerHeight ?? DEFAULT_BANNERS[0].height,
-    nameScale: Number(saved.bannerNameScale ?? DEFAULT_BANNERS[0].nameScale),
-    scoreScale: Number(saved.bannerScoreScale ?? DEFAULT_BANNERS[0].scoreScale),
-    showLogo: saved.showBannerLogo ?? DEFAULT_BANNERS[0].showLogo,
-  };
-  return [normalizeBanner(legacyPrimary, DEFAULT_BANNERS[0]), DEFAULT_BANNERS[1]];
-}
 
 export default function useSyncedState() {
   const [state, setState] = useState(() => {
     const saved = loadState() ?? {};
-    return normalizeState({
-      ...DEFAULT_STATE,
-      ...saved,
-      banners: migrateBanners(saved),
-      canvas: migrateCanvas(saved),
-      displayPageSize: Math.min(10, Math.max(1, Number(saved.displayPageSize ?? DEFAULT_STATE.displayPageSize))),
-      displayRotationMs: Math.max(0, Number(saved.displayRotationMs ?? DEFAULT_STATE.displayRotationMs)),
-      displayShowPagination: saved.displayShowPagination ?? DEFAULT_STATE.displayShowPagination,
-      showDisplayLogo: saved.showDisplayLogo ?? DEFAULT_STATE.showDisplayLogo,
-      showLiveTimer: saved.showLiveTimer ?? DEFAULT_STATE.showLiveTimer,
-      bannerTimerShowName: saved.bannerTimerShowName ?? DEFAULT_STATE.bannerTimerShowName,
-    });
+    // Les anciens réglages d'affichage (bandeaux, canevas, tableau) sont
+    // convertis en sorties par normalizeState.
+    return normalizeState({ ...DEFAULT_STATE, ...saved });
   });
   const params = useMemo(() => {
     if (typeof window === "undefined") return { useNet: false, roomId: "default" };

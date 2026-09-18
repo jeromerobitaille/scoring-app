@@ -19,6 +19,7 @@
  *   Competitor         { id, name, hometown, animal, contractor }
  *                      animal / contractor : bête tirée et entrepreneur de bétail
  *   look               apparence des sorties (voir look.js)
+ *   outputs            sorties composées dans l'éditeur (voir outputs.js)
  *   Entry              { id, name, competitorId?, raw, parsed, timeHint,
  *                        time?, penalty? }   // time + penalty = parsed (chrono)
  *
@@ -29,6 +30,7 @@
  */
 
 import { normalizeLook } from "./look.js";
+import { normalizeOutputs, LEGACY_STATE_KEYS } from "./outputs.js";
 
 const newId = () =>
   (typeof crypto !== "undefined" && crypto.randomUUID)
@@ -170,10 +172,17 @@ export function normalizeState(input) {
     ? state.pendingRun
     : null;
 
+  // Anciens réglages d'affichage (bandeaux, canevas, tableau) : convertis en
+  // sorties une fois, puis retirés de l'état.
+  const outputs = normalizeOutputs(state);
+  const rest = { ...state };
+  for (const k of LEGACY_STATE_KEYS) delete rest[k];
+
   return {
-    ...state,
+    ...rest,
     disciplines,
     rodeos,
+    outputs,
     currentRodeoId: rodeo.id,
     currentDisciplineId: discipline.id,
     timerArmed,

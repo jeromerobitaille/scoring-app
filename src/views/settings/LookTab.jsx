@@ -1,27 +1,11 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Card from "../../components/ui/Card";
 import Label from "../../components/ui/Label";
-import LeaderboardScreen from "../../components/outputs/LeaderboardScreen";
-import BannerView from "../../components/BannerView";
+import OutputStage from "../../components/outputs/OutputStage";
 import { FONTS, PRESETS, applyPreset, normalizeLook } from "../../state/look";
-
-// Données d'exemple pour les aperçus (ligne de coupure visible au 4e rang).
-const SAMPLE_ROSTER = [
-  { id: "p1", name: "Jayden Roy", hometown: "Mascouche, QC", animal: "Tickle My Fancy", contractor: "Championship Pro" },
-  { id: "p2", name: "Keenan Hayes", hometown: "Hayden, CO" },
-  { id: "p3", name: "Jess Pope", hometown: "Waverly, KS" },
-  { id: "p4", name: "R.C. Landingham", hometown: "Hat Creek, CA" },
-  { id: "p5", name: "Leighton Berry", hometown: "Weatherford, TX" },
-  { id: "p6", name: "Wacey Schalla", hometown: "Arapaho, OK" },
-];
-const SAMPLE_ENTRIES = [
-  { id: "e2", competitorId: "p2", name: "Keenan Hayes", parsed: 86.5 },
-  { id: "e3", competitorId: "p3", name: "Jess Pope", parsed: 85.5 },
-  { id: "e4", competitorId: "p4", name: "R.C. Landingham", parsed: 84.25 },
-  { id: "e5", competitorId: "p5", name: "Leighton Berry", parsed: 84 },
-  { id: "e6", competitorId: "p6", name: "Wacey Schalla", parsed: 83 },
-];
-const SAMPLE_TIMER = { seconds: 6.42, state: "running", runId: 1, session: "preview" };
+import { buildContext, outputStateOf } from "../../state/context";
+import { computeRanking } from "../../utils/score";
+import { SAMPLE_ENTRIES, SAMPLE_ROSTER, SAMPLE_TIMER } from "../../state/sample";
 
 const COLOR_FIELDS = [
   ["bg1", "Fond (haut)"],
@@ -85,16 +69,24 @@ export default function LookTab({ state, push }) {
   const setFont = (key, value) => set({ fonts: { ...look.fonts, [key]: value } });
   const setOption = (patch) => push({ ...state, look: normalizeLook({ ...look, ...patch }) });
 
-  const banner = state.banners?.[0] ?? { width: 2592, height: 216, pageSize: 3, nameScale: 1, scoreScale: 1, showLogo: true };
-  const sampleMode = state.scoreMode ?? "higher";
+  // Aperçus : les deux premières sorties (tableau et bandeau), avec des
+  // données d'exemple si la compétition est vide.
+  const previews = state.outputs.slice(0, 2);
+  const ctx = useMemo(() => {
+    const base = buildContext({ ...state, look }, SAMPLE_TIMER);
+    const ranked = base.ranked.length ? base.ranked : computeRanking(SAMPLE_ENTRIES[state.scoreMode] ?? SAMPLE_ENTRIES.higher, state.scoreMode);
+    const byCompetitor = base.ranked.length ? base.byCompetitor : new Map(SAMPLE_ROSTER.map((p) => [p.id, p]));
+    const current = base.current ?? SAMPLE_ROSTER[0];
+    return { ...base, ranked, byCompetitor, current, timerTarget: 8, outputState: outputStateOf(ranked, null) };
+  }, [state, look]);
 
   return (
     <Card>
       <div className="mb-4">
         <h2 className="text-lg font-semibold">Apparence des sorties</h2>
         <p className="text-sm opacity-70">
-          Couleurs, polices et options du tableau plein écran, des bandeaux LED et du
-          canevas. Les aperçus utilisent des données d'exemple et se mettent à jour en direct.
+          Couleurs, polices, arrondi et ligne de coupure, partagés par toutes les sorties
+          composées dans l'Éditeur. Les aperçus utilisent des données d'exemple.
         </p>
       </div>
 
@@ -165,80 +157,28 @@ export default function LookTab({ state, push }) {
           </div>
 
           <div>
-            <Label htmlFor="look-title">Titre au-dessus de la discipline</Label>
-            <input
-              id="look-title"
-              className={`${INPUT} mt-1`}
-              placeholder="Ex. Festival Western de St-Tite"
-              defaultValue={look.headerTitle}
-              key={look.headerTitle}
-              onBlur={(e) => setOption({ headerTitle: e.target.value })}
-              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-            />
-          </div>
-
-          <div>
             <Label htmlFor="look-cut">Ligne de coupure — {look.cutLine ? `après le ${look.cutLine}ᵉ rang` : "aucune"}</Label>
             <input id="look-cut" type="range" min="0" max="15" step="1" value={look.cutLine} onChange={(e) => setOption({ cutLine: Number(e.target.value) })} className="w-full mt-1" />
             <p className="text-[11px] opacity-60 mt-1">Trait rouge sous le dernier qualifié (finale, prime, etc.).</p>
           </div>
 
-          <div className="space-y-2">
-            {[
-              ["showHometown", "Afficher la ville d'origine"],
-              ["showAnimal", "Afficher l'animal et l'entrepreneur (bloc « sur le parcours »)"],
-              ["showUnofficial", "Mention « Non officiel » au bas du tableau"],
-            ].map(([key, label]) => (
-              <label key={key} className="flex items-center gap-2 select-none cursor-pointer">
-                <input type="checkbox" checked={!!look[key]} onChange={(e) => setOption({ [key]: e.target.checked })} className="w-4 h-4" />
-                <span className="text-sm">{label}</span>
-              </label>
-            ))}
-          </div>
+          <p className="text-[11px] opacity-60">
+            Titre, ville d'origine, animal, mention « Non officiel » : ce sont des éléments de chaque sortie, à modifier dans l'onglet Éditeur.
+          </p>
         </div>
 
         {/* Aperçus */}
         <div className="space-y-4 min-w-0">
-          <div>
-            <div className="text-xs uppercase tracking-wide opacity-60 mb-2">Tableau plein écran (1920 × 1080)</div>
-            <Scaled width={1920} height={1080} maxWidth={720}>
-              <LeaderboardScreen
-                look={look}
-                entries={SAMPLE_ENTRIES}
-                roster={SAMPLE_ROSTER}
-                scoreMode={sampleMode}
-                eventName={state.eventName || "Monte de taureaux"}
-                rodeoName={state.rodeoName}
-                current={SAMPLE_ROSTER[0]}
-                timerFrame={SAMPLE_TIMER}
-                timerTarget={8}
-                width={1920}
-                height={1080}
-                pageSize={Number(state.displayPageSize) || 5}
-                rotationMs={0}
-                showLogo={state.showDisplayLogo !== false}
-                showHero={state.displayShowHero !== false}
-              />
-            </Scaled>
-          </div>
-          <div>
-            <div className="text-xs uppercase tracking-wide opacity-60 mb-2">Bandeau principal ({banner.width} × {banner.height})</div>
-            <Scaled width={banner.width} height={banner.height} maxWidth={720}>
-              <div style={{ position: "relative", width: banner.width, height: banner.height }}>
-                <BannerView
-                  banner={banner}
-                  entries={SAMPLE_ENTRIES}
-                  roster={SAMPLE_ROSTER}
-                  scoreMode={sampleMode}
-                  eventName={state.eventName}
-                  width={banner.width}
-                  height={banner.height}
-                  look={look}
-                  contextKey="preview"
-                />
-              </div>
-            </Scaled>
-          </div>
+          {previews.map((o) => (
+            <div key={o.id}>
+              <div className="text-xs uppercase tracking-wide opacity-60 mb-2">{o.name} ({o.width} × {o.height})</div>
+              <Scaled width={o.width} height={o.height} maxWidth={720}>
+                <div style={{ position: "relative", width: o.width, height: o.height }}>
+                  <OutputStage output={o} ctx={{ ...ctx, timerFrame: o.elements.some((e) => e.kind === "timer" && e.states.results) ? SAMPLE_TIMER : null }} />
+                </div>
+              </Scaled>
+            </div>
+          ))}
         </div>
       </div>
     </Card>

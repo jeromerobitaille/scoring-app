@@ -1,18 +1,11 @@
 import React, { useEffect, useState } from "react";
 import useSyncedState from "../state/useSyncedState";
-import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Label from "../components/ui/Label";
-import TextInput from "../components/ui/TextInput";
 import Tabs from "../components/ui/Tabs";
-import { bus } from "../sync/SyncBus";
 import {
-  ComputerDesktopIcon,
-  TvIcon,
   QrCodeIcon,
   Squares2X2Icon,
-  PlusIcon,
-  TrashIcon,
   ClockIcon,
   ArrowPathIcon,
   UserGroupIcon,
@@ -23,357 +16,16 @@ import {
 import { ArrowLeftIcon } from "@heroicons/react/24/solid";
 import ShareConnection from "../components/ShareConnection";
 import ThemeToggle from "../components/ui/ThemeToggle";
-import OutputLauncher from "../components/FullscreenLauncher";
 import useLiveTimer, { TIMER_STATE_LABEL } from "../hooks/useLiveTimer";
 import { formatScore } from "../utils/score";
 import RodeosTab from "./settings/RodeosTab";
 import DisciplinesTab from "./settings/DisciplinesTab";
 import BackupTab from "./settings/BackupTab";
 import LookTab from "./settings/LookTab";
-import CanvasTab from "./settings/CanvasTab";
-
-function BannerPreview({ width, height }) {
-  const w = Math.max(1, Number(width) || 0);
-  const h = Math.max(1, Number(height) || 0);
-  const maxW = 320;
-  const maxH = 80;
-  const scale = Math.min(maxW / w, maxH / h, 1);
-  const dispW = Math.round(w * scale);
-  const dispH = Math.round(h * scale);
-  return (
-    <div className="flex flex-col items-center gap-2">
-      <div
-        className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-gradient-to-r from-zinc-900 to-black flex items-center justify-center text-[10px] text-white/60 font-mono"
-        style={{ width: dispW, height: Math.max(dispH, 6) }}
-      >
-        {dispH >= 14 ? `${w}×${h}` : ""}
-      </div>
-      <div className="text-[11px] opacity-60 tabular-nums">
-        {w} × {h} px · ratio {(w / h).toFixed(2)}:1
-      </div>
-    </div>
-  );
-}
-
-function DisplayPreview({ pageSize, showPagination }) {
-  const rows = Math.min(10, Math.max(1, pageSize));
-  return (
-    <div className="rounded-xl border border-zinc-300 dark:border-zinc-700 bg-gradient-to-b from-zinc-50 to-zinc-100 dark:from-zinc-950 dark:to-zinc-900 p-3 w-full max-w-xs">
-      <div className="h-3 mb-2 rounded bg-zinc-300 dark:bg-zinc-700 mx-auto" style={{ width: "60%" }} />
-      <div className="space-y-1.5">
-        {Array.from({ length: rows }).map((_, i) => {
-          const medalColor =
-            i === 0 ? "bg-amber-400"
-              : i === 1 ? "bg-zinc-300"
-              : i === 2 ? "bg-orange-700"
-              : "bg-zinc-500/40 dark:bg-zinc-700";
-          return (
-            <div
-              key={i}
-              className="flex items-center gap-1.5 px-1.5 py-1 rounded-md bg-white/80 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800"
-            >
-              <span className={`w-3 h-3 rounded-full ${medalColor}`} />
-              <span className="flex-1 h-1.5 rounded bg-zinc-300 dark:bg-zinc-700" />
-              <span className="w-6 h-1.5 rounded bg-zinc-400 dark:bg-zinc-600" />
-            </div>
-          );
-        })}
-      </div>
-      {showPagination && (
-        <div className="mt-2 flex justify-center gap-1">
-          <span className="w-1 h-1 rounded-full bg-zinc-800 dark:bg-zinc-200" />
-          <span className="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700" />
-          <span className="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700" />
-        </div>
-      )}
-    </div>
-  );
-}
+import EditorTab from "./settings/editor/EditorTab";
 
 function QrTab() {
   return <ShareConnection />;
-}
-
-function BannerConfigSection({ banner, index, state, push }) {
-  const updateBanner = (patch) => {
-    const next = state.banners.map((b, i) => (i === index ? { ...b, ...patch } : b));
-    push({ ...state, banners: next });
-  };
-
-  const id = (suffix) => `b${index}-${suffix}`;
-
-  function buildBannerUrl() {
-    const url = new URL(window.location.href);
-    url.searchParams.delete("settings");
-    url.searchParams.set("banner", "1");
-    url.searchParams.set("bid", String(index));
-    url.searchParams.set("w", String(banner.width));
-    url.searchParams.set("h", String(banner.height));
-    return url.toString();
-  }
-
-  return (
-    <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4">
-      <div className="mb-4">
-        <input
-          type="text"
-          value={banner.label}
-          onChange={(e) => updateBanner({ label: e.target.value })}
-          className="text-base font-semibold bg-transparent border-0 border-b border-transparent hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-zinc-500 focus:outline-none px-0 py-0.5 w-full"
-          aria-label="Nom du bandeau"
-        />
-        <p className="text-xs opacity-60 mt-1">
-          {banner.width} × {banner.height} px · {banner.pageSize} entrée{banner.pageSize > 1 ? "s" : ""} par page
-        </p>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor={id("w")}>Largeur (px)</Label>
-              <TextInput
-                id={id("w")}
-                type="number"
-                value={banner.width}
-                onChange={(e) => updateBanner({ width: Math.max(320, Number(e.target.value) || 0) })}
-                inputMode="numeric"
-              />
-            </div>
-            <div>
-              <Label htmlFor={id("h")}>Hauteur (px)</Label>
-              <TextInput
-                id={id("h")}
-                type="number"
-                value={banner.height}
-                onChange={(e) => updateBanner({ height: Math.max(64, Number(e.target.value) || 0) })}
-                inputMode="numeric"
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor={id("pageSize")}>
-              Entrées par page — {banner.pageSize}
-            </Label>
-            <input
-              id={id("pageSize")}
-              type="range"
-              min="1" max="6" step="1"
-              value={banner.pageSize}
-              onChange={(e) => updateBanner({ pageSize: Number(e.target.value) })}
-              className="w-full mt-1"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor={id("nameScale")}>
-              Taille du nom — {Number(banner.nameScale).toFixed(2)}×
-            </Label>
-            <input
-              id={id("nameScale")}
-              type="range"
-              min="0.6" max="2" step="0.05"
-              value={banner.nameScale}
-              onChange={(e) => updateBanner({ nameScale: Math.min(2, Math.max(0.6, Number(e.target.value))) })}
-              className="w-full mt-1"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor={id("scoreScale")}>
-              Taille du score — {Number(banner.scoreScale).toFixed(2)}×
-            </Label>
-            <input
-              id={id("scoreScale")}
-              type="range"
-              min="0.6" max="2" step="0.05"
-              value={banner.scoreScale}
-              onChange={(e) => updateBanner({ scoreScale: Math.min(2, Math.max(0.6, Number(e.target.value))) })}
-              className="w-full mt-1"
-            />
-          </div>
-
-          <label className="flex items-center gap-2 select-none cursor-pointer">
-            <input
-              type="checkbox"
-              checked={banner.showLogo !== false}
-              onChange={(e) => updateBanner({ showLogo: e.target.checked })}
-              className="w-4 h-4"
-            />
-            <span className="text-sm">Afficher le logo Festival Western</span>
-          </label>
-        </div>
-
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <div className="text-xs opacity-60 mb-2">Aperçu des proportions</div>
-          <BannerPreview width={banner.width} height={banner.height} />
-        </div>
-      </div>
-
-      <div className="mt-4 flex justify-end">
-        <OutputLauncher
-          buildUrl={buildBannerUrl}
-          windowName={`rodeo-banner-${index}`}
-          windowFeatures={`noopener,noreferrer,width=${banner.width},height=${banner.height}`}
-          label="Ouvrir le bandeau"
-          icon={TvIcon}
-          onBeforeLaunch={() => bus?.post({ type: "sync:update", payload: state })}
-          stacked
-        />
-      </div>
-    </div>
-  );
-}
-
-function BannerTab({ state, push }) {
-  const banners = state.banners ?? [];
-  return (
-    <Card>
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold">Bandeaux LED</h2>
-        <p className="text-sm opacity-70">
-          Deux bandeaux indépendants — chacun avec sa propre résolution, son nombre
-          d'entrées par page, et sa fenêtre. Utile par exemple pour un grand bandeau
-          d'arène et un second plus petit en régie.
-        </p>
-      </div>
-      <div className="space-y-4">
-        {banners.map((b, i) => (
-          <BannerConfigSection
-            key={b.id || i}
-            banner={b}
-            index={i}
-            state={state}
-            push={push}
-          />
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-function TableTab({ state, push }) {
-  const setPageSize = (v) =>
-    push({ ...state, displayPageSize: Math.min(10, Math.max(1, Number(v) || 5)) });
-  const setRotationMs = (v) =>
-    push({ ...state, displayRotationMs: Math.max(0, Number(v) || 0) });
-  const setShowPagination = (v) =>
-    push({ ...state, displayShowPagination: !!v });
-
-  function buildDisplayUrl() {
-    const url = new URL(window.location.href);
-    url.searchParams.delete("settings");
-    url.searchParams.set("display", "1");
-    return url.toString();
-  }
-
-  const rotationSec = Math.round((state.displayRotationMs ?? 5000) / 1000);
-  const rotationOff = rotationSec === 0;
-
-  return (
-    <Card>
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold">Tableau plein écran</h2>
-        <p className="text-sm opacity-70">
-          Affichage pour 2<sup>e</sup> écran ou projecteur. Pagination automatique
-          quand il y a plus d'entrées qu'une page.
-        </p>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="pageSize">
-              Entrées par page — {state.displayPageSize ?? 5}
-            </Label>
-            <input
-              id="pageSize"
-              type="range"
-              min="1" max="10" step="1"
-              value={state.displayPageSize ?? 5}
-              onChange={(e) => setPageSize(e.target.value)}
-              className="w-full mt-1"
-            />
-            <p className="text-[11px] opacity-60 mt-1">
-              Selon la résolution du projecteur — moins d'entrées = texte plus gros.
-            </p>
-          </div>
-
-          <div>
-            <Label htmlFor="rotation">
-              Rotation auto — {rotationOff ? "désactivée" : `${rotationSec} s`}
-            </Label>
-            <input
-              id="rotation"
-              type="range"
-              min="0" max="15" step="1"
-              value={rotationSec}
-              onChange={(e) => setRotationMs(Number(e.target.value) * 1000)}
-              className="w-full mt-1"
-            />
-            <p className="text-[11px] opacity-60 mt-1">
-              {rotationOff
-                ? "L'affichage reste sur la première page (utile pour figer le top)."
-                : "Cycle automatique entre les pages."}
-            </p>
-          </div>
-
-          <label className="flex items-center gap-2 select-none cursor-pointer">
-            <input
-              type="checkbox"
-              checked={state.displayShowPagination !== false}
-              onChange={(e) => setShowPagination(e.target.checked)}
-              className="w-4 h-4"
-            />
-            <span className="text-sm">Afficher les points de pagination</span>
-          </label>
-
-          <label className="flex items-center gap-2 select-none cursor-pointer">
-            <input
-              type="checkbox"
-              checked={state.showDisplayLogo !== false}
-              onChange={(e) => push({ ...state, showDisplayLogo: e.target.checked })}
-              className="w-4 h-4"
-            />
-            <span className="text-sm">Afficher le logo Festival Western</span>
-          </label>
-
-          <label className="flex items-center gap-2 select-none cursor-pointer">
-            <input
-              type="checkbox"
-              checked={state.displayShowHero !== false}
-              onChange={(e) => push({ ...state, displayShowHero: e.target.checked })}
-              className="w-4 h-4"
-            />
-            <span className="text-sm">Bloc « sur le parcours » (compétiteur en cours, animal, chrono)</span>
-          </label>
-          <p className="text-[11px] opacity-60 -mt-2">
-            Couleurs, polices et ligne de coupure : onglet Apparence.
-          </p>
-        </div>
-
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <div className="text-xs opacity-60 mb-2">Aperçu</div>
-          <DisplayPreview
-            pageSize={state.displayPageSize ?? 5}
-            showPagination={state.displayShowPagination !== false}
-          />
-        </div>
-      </div>
-
-      <div className="mt-5 flex justify-end">
-        <OutputLauncher
-          buildUrl={buildDisplayUrl}
-          windowName="rodeo-display"
-          label="Ouvrir l'affichage"
-          icon={ComputerDesktopIcon}
-          onBeforeLaunch={() => bus?.post({ type: "sync:update", payload: state })}
-          stacked
-        />
-      </div>
-    </Card>
-  );
 }
 
 const BAUD_RATES = [9600, 1200, 2400, 4800, 19200, 38400];
@@ -404,31 +56,18 @@ function TimerTab({ state, push }) {
     setConfig(r.config);
   }
 
-  const showLive = state.showLiveTimer !== false;
   const liveToggle = (
-    <div className="space-y-2">
-      <label className="flex items-center gap-2 select-none cursor-pointer">
-        <input
-          type="checkbox"
-          checked={showLive}
-          onChange={(e) => push({ ...state, showLiveTimer: e.target.checked })}
-          className="w-4 h-4"
-        />
-        <span className="text-sm">
-          Afficher le chrono en direct sur le tableau et les bandeaux (quand il est armé)
-        </span>
-      </label>
-      <label className={`flex items-center gap-2 select-none cursor-pointer pl-6 ${showLive ? "" : "opacity-40"}`}>
-        <input
-          type="checkbox"
-          checked={!!state.bannerTimerShowName}
-          disabled={!showLive}
-          onChange={(e) => push({ ...state, bannerTimerShowName: e.target.checked })}
-          className="w-4 h-4"
-        />
-        <span className="text-sm">Bandeaux : afficher le nom du compétiteur à côté du temps</span>
-      </label>
-    </div>
+    <label className="flex items-center gap-2 select-none cursor-pointer">
+      <input
+        type="checkbox"
+        checked={state.showLiveTimer !== false}
+        onChange={(e) => push({ ...state, showLiveTimer: e.target.checked })}
+        className="w-4 h-4"
+      />
+      <span className="text-sm">
+        Afficher le chrono en direct sur les sorties (quand il est armé)
+      </span>
+    </label>
   );
 
   if (!api) {
@@ -545,11 +184,9 @@ function TimerTab({ state, push }) {
 const TABS = [
   { id: "rodeos",      label: "Rodéos",      icon: UserGroupIcon },
   { id: "disciplines", label: "Disciplines", icon: AdjustmentsHorizontalIcon },
+  { id: "editor", label: "Éditeur", icon: Squares2X2Icon },
   { id: "look",   label: "Apparence", icon: PaintBrushIcon },
   { id: "qr",     label: "QR codes", icon: QrCodeIcon },
-  { id: "banner", label: "Bandeau",  icon: TvIcon },
-  { id: "canvas", label: "Canevas",  icon: Squares2X2Icon },
-  { id: "table",  label: "Tableau",  icon: ComputerDesktopIcon },
   { id: "timer",  label: "Chrono",   icon: ClockIcon },
   { id: "backup", label: "Sauvegarde", icon: ArchiveBoxIcon },
 ];
@@ -558,7 +195,8 @@ export default function SettingsView() {
   const [state, push] = useSyncedState();
   const [active, setActive] = useState(() => {
     const tab = new URLSearchParams(window.location.search).get("tab");
-    return TABS.some((t) => t.id === tab) ? tab : "rodeos";
+    const legacy = { banner: "editor", canvas: "editor", table: "editor" };
+    return TABS.some((t) => t.id === tab) ? tab : legacy[tab] ?? "rodeos";
   });
 
   useEffect(() => { document.title = "FWST Scoring — Paramètres"; }, []);
@@ -569,9 +207,6 @@ export default function SettingsView() {
   function goToScoring() {
     const url = new URL(window.location.href);
     url.searchParams.delete("settings");
-    url.searchParams.delete("display");
-    url.searchParams.delete("banner");
-    url.searchParams.delete("canvas");
     url.searchParams.delete("tab");
     window.location.href = url.toString();
   }
@@ -608,11 +243,9 @@ export default function SettingsView() {
 
         {active === "rodeos"      && <RodeosTab state={state} push={push} />}
         {active === "disciplines" && <DisciplinesTab state={state} push={push} />}
+        {active === "editor" && <EditorTab state={state} push={push} />}
         {active === "look"   && <LookTab state={state} push={push} />}
         {active === "qr"     && <QrTab />}
-        {active === "banner" && <BannerTab state={state} push={push} />}
-        {active === "canvas" && <CanvasTab state={state} push={push} />}
-        {active === "table"  && <TableTab state={state} push={push} />}
         {active === "timer"  && <TimerTab state={state} push={push} />}
         {active === "backup" && <BackupTab state={state} push={push} />}
       </div>
