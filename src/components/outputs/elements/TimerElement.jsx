@@ -1,6 +1,7 @@
 import React from "react";
 import TimerDisplay from "../../TimerDisplay";
 import { TIMER_FONT_KEY, cardStyle } from "../../../state/look";
+import { fontKeyFor } from "./util";
 
 /** Chrono en direct : rien tant qu'aucun temps n'est à montrer. */
 export default function TimerElement({ el, ctx }) {
@@ -21,7 +22,7 @@ export default function TimerElement({ el, ctx }) {
         height={el.height}
         align={el.align}
         scale={el.timeScale}
-        font={TIMER_FONT_KEY[look.fonts.numbers]}
+        font={TIMER_FONT_KEY[fontKeyFor(el.font, look, "numbers")]}
         color={look.colors.text}
         targetColor={look.colors.timerTarget}
         target={ctx.timerTarget}

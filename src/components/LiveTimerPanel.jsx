@@ -29,6 +29,9 @@ export default function LiveTimerPanel({
   const { frame, status, online } = useLiveTimer();
   const onStopRef = useRef(onStop);
   const handledRef = useRef(null); // { session, runId } de la dernière course traitée
+  const ignoredRef = useRef(null); // `${session}:${runId}` d'un faux départ (pendant une validation)
+  const pendingRef = useRef(pendingSeconds != null);
+  pendingRef.current = pendingSeconds != null;
 
   useEffect(() => { onStopRef.current = onStop; }, [onStop]);
 
@@ -44,11 +47,23 @@ export default function LiveTimerPanel({
       };
       return;
     }
+    const key = `${frame.session}:${frame.runId}`;
+    // Départ pendant qu'une arrivée attend sa validation (cheval qui repasse
+    // devant la cellule) : cette course est ignorée, même après la validation.
+    if (frame.state === "running" && frame.runId > handled.runId && pendingRef.current) {
+      ignoredRef.current = key;
+    }
     if (frame.state === "stopped" && frame.runId > handled.runId && frame.seconds > 0) {
       handledRef.current = { session: frame.session, runId: frame.runId };
-      onStopRef.current?.(frame);
+      if (ignoredRef.current !== key) onStopRef.current?.(frame);
     }
   }, [frame]);
+
+  const frameKey = frame ? `${frame.session}:${frame.runId}` : null;
+  const ignoredRun = frameKey != null && ignoredRef.current === frameKey;
+  // Arrivée en attente : le temps reste gelé sur celui à valider.
+  const frozen = pendingSeconds != null && withFinishDialog;
+  const shownSeconds = frozen ? pendingSeconds : frame?.seconds;
 
   const state = frame?.state ?? "unknown";
   const connected = online && status?.connected;
@@ -100,15 +115,15 @@ export default function LiveTimerPanel({
           connected ? "" : "opacity-30"
         }`}
         aria-live="off"
-        style={connected && frame && targetReached(frame.seconds, target) ? { color: TARGET_REACHED_COLOR } : undefined}
+        style={connected && frame && targetReached(shownSeconds, target) ? { color: TARGET_REACHED_COLOR } : undefined}
       >
-        {connected && frame ? formatScore(frame.seconds, "time") : "–.–––"}
+        {connected && frame ? formatScore(shownSeconds, "time") : "–.–––"}
       </div>
       <div className="flex-1 min-w-[12rem] space-y-1">
         <div className="flex items-center gap-2 min-w-0">
           {connected && (
-            <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold flex-shrink-0 ${BADGE[state]}`}>
-              {TIMER_STATE_LABEL[state]}
+            <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold flex-shrink-0 ${frozen ? BADGE.stopped : ignoredRun ? BADGE.ready : BADGE[state]}`}>
+              {frozen ? "À valider" : ignoredRun ? "Départ ignoré" : TIMER_STATE_LABEL[state]}
             </span>
           )}
           <span className="truncate text-sm">

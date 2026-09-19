@@ -8,6 +8,8 @@ import { BTN, BTN_DANGER, ColorSelect, Field, INPUT, NumberField, SMALL, Section
 import CropEditor from "./CropEditor";
 
 const FONT_OPTIONS = Object.entries(FONTS).map(([k, f]) => [k, f.label]);
+const THEME_FONT_OPTIONS = [["theme", "Du thème (Apparence)"], ...FONT_OPTIONS];
+const scale = (v) => `${v.toFixed(2)}×`;
 const ALIGN_OPTIONS = [["left", "Gauche"], ["center", "Centré"], ["right", "Droite"]];
 const VALIGN_OPTIONS = [["top", "Haut"], ["middle", "Milieu"], ["bottom", "Bas"]];
 const sec = (ms) => (ms ? `${Math.round(ms / 1000)} s` : "figé");
@@ -141,6 +143,8 @@ function TableProps({ el, set }) {
         <Slider label="Rotation des pages" value={el.rotationMs} onChange={(v) => set({ rotationMs: v })} min={0} max={20000} step={1000} format={sec} />
         <Slider label="Taille du texte" value={el.fontScale} onChange={(v) => set({ fontScale: v })} min={0.5} max={2} step={0.05} format={(v) => `${v.toFixed(2)}×`} />
         <SelectField label="Style des rangées" value={el.rowStyle} onChange={(v) => set({ rowStyle: v })} options={[["card", "Cartes"], ["line", "Lignes"]]} />
+        <SelectField label="Police des noms" value={el.nameFont} onChange={(v) => set({ nameFont: v })} options={THEME_FONT_OPTIONS} />
+        <SelectField label="Police des chiffres" value={el.numberFont} onChange={(v) => set({ numberFont: v })} options={THEME_FONT_OPTIONS} />
       </div>
       <Field label="Texte quand il n'y a aucun résultat">
         <input className={SMALL} value={el.emptyText} onChange={(e) => set({ emptyText: e.target.value })} />
@@ -158,18 +162,77 @@ function TableProps({ el, set }) {
 
 function CarouselProps({ el, set }) {
   return (
-    <Section title="Carrousel">
-      <div className="grid grid-cols-2 gap-2">
-        <Slider label="Cartes par page" value={el.pageSize} onChange={(v) => set({ pageSize: v })} min={1} max={8} step={1} />
-        <Slider label="Rotation" value={el.rotationMs} onChange={(v) => set({ rotationMs: v })} min={1000} max={20000} step={1000} format={sec} />
-        <Slider label="Taille du nom" value={el.nameScale} onChange={(v) => set({ nameScale: v })} min={0.6} max={2} step={0.05} format={(v) => `${v.toFixed(2)}×`} />
-        <Slider label="Taille du résultat" value={el.scoreScale} onChange={(v) => set({ scoreScale: v })} min={0.6} max={2} step={0.05} format={(v) => `${v.toFixed(2)}×`} />
-      </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1">
-        <Toggle label="Ville" checked={el.showHometown} onChange={(v) => set({ showHometown: v })} />
-        <Toggle label="Annoncer un nouveau résultat (5 s)" checked={el.flashNew} onChange={(v) => set({ flashNew: v })} />
-      </div>
-    </Section>
+    <>
+      <Section title="Carrousel">
+        <div className="grid grid-cols-2 gap-2">
+          <Slider label="Cartes par page" value={el.pageSize} onChange={(v) => set({ pageSize: v })} min={1} max={8} step={1} />
+          <Slider label="Rotation" value={el.rotationMs} onChange={(v) => set({ rotationMs: v })} min={1000} max={20000} step={1000} format={sec} />
+        </div>
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
+          <Toggle label="Ville" checked={el.showHometown} onChange={(v) => set({ showHometown: v })} />
+          <Toggle label="Annoncer un nouveau résultat (5 s)" checked={el.flashNew} onChange={(v) => set({ flashNew: v })} />
+        </div>
+      </Section>
+      <Section title="Tailles">
+        <div className="grid grid-cols-2 gap-2">
+          <Slider label="Pastille du rang" value={el.badgeScale} onChange={(v) => set({ badgeScale: v })} min={0.4} max={2.5} step={0.05} format={scale} />
+          <Slider label="Nom" value={el.nameScale} onChange={(v) => set({ nameScale: v })} min={0.4} max={3} step={0.05} format={scale} />
+          <Slider label="Résultat (score / temps)" value={el.scoreScale} onChange={(v) => set({ scoreScale: v })} min={0.4} max={3} step={0.05} format={scale} />
+          <Slider label="Espace entre les cartes" value={el.gapScale} onChange={(v) => set({ gapScale: v })} min={0} max={4} step={0.1} format={scale} />
+        </div>
+      </Section>
+      <Section title="Polices et couleurs">
+        <div className="grid grid-cols-2 gap-2">
+          <SelectField label="Police des noms" value={el.nameFont} onChange={(v) => set({ nameFont: v })} options={THEME_FONT_OPTIONS} />
+          <SelectField label="Police des chiffres" value={el.numberFont} onChange={(v) => set({ numberFont: v })} options={THEME_FONT_OPTIONS} />
+          <ColorSelect label="Couleur des noms" value={el.nameColor} onChange={(v) => set({ nameColor: v })} />
+          <ColorSelect label="Couleur des résultats" value={el.scoreColor} onChange={(v) => set({ scoreColor: v })} />
+        </div>
+      </Section>
+      <Section title="Carte de chaque résultat">
+        <div className="grid grid-cols-2 gap-2">
+          <SelectField label="Fond" value={el.cardFill} onChange={(v) => set({ cardFill: v })} options={[["card", "Carte du thème"], ["custom", "Couleur libre"], ["none", "Aucun (transparent)"]]} />
+          <Slider label="Marge intérieure" value={el.paddingScale} onChange={(v) => set({ paddingScale: v })} min={0} max={3} step={0.05} format={scale} />
+          {el.cardFill === "custom" && (
+            <>
+              <Field label="Couleur du fond">
+                <input type="color" value={el.cardColor} onChange={(e) => set({ cardColor: e.target.value })} className="block w-full h-7 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent cursor-pointer" />
+              </Field>
+              <NumberField label="Opacité" value={el.cardOpacity} onChange={(v) => set({ cardOpacity: v })} min={0} max={1} step={0.05} />
+            </>
+          )}
+          <Field label="Bordure">
+            <div className="flex gap-1">
+              <select
+                className={SMALL}
+                value={!el.cardBorder ? "none" : el.cardBorderColor ? "custom" : "theme"}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  set(v === "none" ? { cardBorder: false } : v === "theme" ? { cardBorder: true, cardBorderColor: null } : { cardBorder: true, cardBorderColor: "#ffffff" });
+                }}
+              >
+                <option value="theme">Du thème</option>
+                <option value="custom">Couleur libre</option>
+                <option value="none">Aucune</option>
+              </select>
+              {el.cardBorder && el.cardBorderColor && (
+                <input type="color" value={el.cardBorderColor} onChange={(e) => set({ cardBorderColor: e.target.value })} className="w-8 h-7 flex-shrink-0 rounded-md border border-zinc-300 dark:border-zinc-700 bg-transparent cursor-pointer" aria-label="Couleur de la bordure" />
+              )}
+            </div>
+          </Field>
+          <Field label="Arrondi">
+            <div className="flex gap-1">
+              <select className={SMALL} value={el.cardRadius == null ? "auto" : "custom"} onChange={(e) => set({ cardRadius: e.target.value === "auto" ? null : 12 })}>
+                <option value="auto">Du thème</option>
+                <option value="custom">Personnalisé</option>
+              </select>
+              {el.cardRadius != null && <input type="number" className={`${SMALL} !w-16`} value={el.cardRadius} min={0} max={200} onChange={(e) => set({ cardRadius: Number(e.target.value) || 0 })} />}
+            </div>
+          </Field>
+        </div>
+        <Toggle label="Ombre" checked={el.cardShadow} onChange={(v) => set({ cardShadow: v })} />
+      </Section>
+    </>
   );
 }
 
@@ -180,6 +243,7 @@ function TimerProps({ el, set }) {
         <Slider label="Taille du temps" value={el.timeScale} onChange={(v) => set({ timeScale: v })} min={0.3} max={2} step={0.05} format={(v) => `${v.toFixed(2)}×`} />
         <SelectField label="Alignement" value={el.align} onChange={(v) => set({ align: v })} options={ALIGN_OPTIONS} />
         <SelectField label="Fond" value={el.fill} onChange={(v) => set({ fill: v })} options={[["none", "Aucun"], ["card", "Carte du thème"], ["black", "Noir, bordure accent"]]} />
+        <SelectField label="Police" value={el.font} onChange={(v) => set({ font: v })} options={THEME_FONT_OPTIONS} />
         <Toggle label="Nom du compétiteur" checked={el.showName} onChange={(v) => set({ showName: v })} className="self-end pb-1.5" />
       </div>
       <p className="text-[11px] opacity-60">

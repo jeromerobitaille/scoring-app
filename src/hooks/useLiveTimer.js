@@ -80,38 +80,62 @@ export function targetReached(seconds, target) {
 }
 
 /**
- * Chrono à afficher sur une sortie (tableau, bandeau, canevas), ou null.
+ * Décide quoi afficher sur une sortie à partir de la trame du chrono. Fonction
+ * pure (testable) : `mem` est la mémoire de l'appelant, modifiée sur place.
+ *   mem = { seen, stop: { key, at } | null, ignored }
+ *
  * - pendant la course : le temps qui défile ;
  * - après l'arrivée : le temps arrêté, tant que la course n'a pas été validée
  *   ou annulée sur le poste du chrono (`pendingRun`, état partagé) ;
+ * - une arrivée en attente GÈLE l'affichage : un nouveau départ déclenché avant
+ *   la validation (cheval qui repasse devant la cellule) est ignoré, y compris
+ *   après la validation, jusqu'à la course suivante ;
  * - jamais pour un temps arrêté dont on n'a pas vu la course (ex. au branchement).
+ *
+ * L'arrêt est traité pendant le rendu, pas dans un effet : sinon une image
+ * sans chrono passe entre « en course » et « arrêté » (scintillement).
  */
-export function useOutputTimer({ enabled, pendingRun = null, holdMs = HOLD_TIME_MODE_MS }) {
-  const { frame } = useLiveTimer({ enabled });
-  const seenRunRef = useRef(null); // `${session}:${runId}` de la dernière course vue en marche
-  const [held, setHeld] = useState(null); // clé de la course dont on affiche l'arrivée
-
+export function resolveOutputTimer(mem, { enabled, frame, pendingRun, holdMs, now }) {
+  if (!enabled) return null;
   const key = frame ? `${frame.session}:${frame.runId}` : null;
   const state = frame?.state;
 
-  useEffect(() => {
-    if (!key) return;
-    if (state === "running") {
-      seenRunRef.current = key;
-      setHeld(null);
-      return;
+  if (key && state === "running") {
+    // Départ vu pendant qu'une arrivée attend sa validation : faux départ.
+    if (pendingRun && mem.seen !== key) mem.ignored = key;
+    if (mem.ignored !== key) {
+      mem.seen = key;
+      mem.stop = null;
     }
-    if (state === "stopped" && seenRunRef.current === key) {
-      setHeld(key);
-      const t = setTimeout(() => setHeld((k) => (k === key ? null : k)), holdMs);
-      return () => clearTimeout(t);
-    }
-    if (state === "ready") setHeld(null);
-  }, [key, state, holdMs]);
+  } else if (key && state === "stopped") {
+    if (mem.seen === key && mem.stop?.key !== key) mem.stop = { key, at: now };
+  } else if (state === "ready") {
+    mem.stop = null;
+  }
 
-  if (!enabled) return null;
-  if (frame && state === "running") return frame;
   if (pendingRun) return { ...pendingRun, state: "stopped" };
-  if (frame && state === "stopped" && held === key) return frame;
+  if (!frame || mem.ignored === key) return null;
+  if (state === "running") return frame;
+  if (state === "stopped" && mem.stop?.key === key && now - mem.stop.at < holdMs) return frame;
   return null;
+}
+
+/** Chrono à afficher sur une sortie (tableau, bandeau, canevas), ou null. Voir resolveOutputTimer. */
+export function useOutputTimer({ enabled, pendingRun = null, holdMs = HOLD_TIME_MODE_MS }) {
+  const { frame } = useLiveTimer({ enabled });
+  const memRef = useRef({ seen: null, stop: null, ignored: null });
+  const [, rerender] = useState(0);
+
+  const shown = resolveOutputTimer(memRef.current, { enabled, frame, pendingRun, holdMs, now: Date.now() });
+
+  // Fin du maintien : un rendu de plus pour retirer le temps arrêté.
+  const stopKey = memRef.current.stop?.key ?? null;
+  useEffect(() => {
+    const stop = memRef.current.stop;
+    if (!stop) return;
+    const t = setTimeout(() => rerender((n) => n + 1), Math.max(0, holdMs - (Date.now() - stop.at)) + 20);
+    return () => clearTimeout(t);
+  }, [stopKey, holdMs]);
+
+  return shown;
 }

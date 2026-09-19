@@ -1,8 +1,8 @@
 import React from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { formatScore, entryDisplayMode } from "../../../utils/score";
-import { cardStyle, fontStyle, hexToRgba, rankBadge } from "../../../state/look";
-import { paginate, useRotation } from "./util";
+import { cardStyle, hexToRgba, rankBadge } from "../../../state/look";
+import { fontKeyFor, paginate, themedFont, useRotation } from "./util";
 
 /**
  * Classement paginé (rang, nom, ville, résultat). Les rangées se partagent la
@@ -11,8 +11,8 @@ import { paginate, useRotation } from "./util";
 export default function TableElement({ el, ctx }) {
   const { look, ranked, scoreMode, byCompetitor } = ctx;
   const { colors } = look;
-  const display = fontStyle(look.fonts.display);
-  const numbers = fontStyle(look.fonts.numbers);
+  const display = themedFont(el.nameFont, look, "display");
+  const numbers = themedFont(el.numberFont, look, "numbers");
   const n = el.pageSize;
   const pages = paginate(ranked, n);
   const pageCount = pages.length || 1;
@@ -27,7 +27,7 @@ export default function TableElement({ el, ctx }) {
   const rowFont = Math.round(rowH * 0.42 * el.fontScale);
   const subFont = Math.round(rowH * 0.2 * el.fontScale);
   const badge = Math.round(rowH * 0.66);
-  const numScale = look.fonts.numbers === "system" ? 1 : 1.35;
+  const numScale = fontKeyFor(el.numberFont, look, "numbers") === "system" ? 1 : 1.35;
   const unitLabel = scoreMode === "lower" ? "s" : "pts";
   const line = el.rowStyle === "line";
 

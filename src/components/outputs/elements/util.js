@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { fontStyle } from "../../../state/look";
 
 /** Couleur d'un élément : clé du thème (text, muted, accent…) ou hexa. */
 export function resolveColor(value, look, fallback = "#ffffff") {
@@ -25,4 +26,13 @@ export function paginate(list, size) {
   const out = [];
   for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
   return out;
+}
+
+/** Clé de police d'un élément : "theme" suit l'onglet Apparence (role = display | numbers). */
+export function fontKeyFor(value, look, role) {
+  return value && value !== "theme" ? value : look.fonts[role];
+}
+
+export function themedFont(value, look, role) {
+  return fontStyle(fontKeyFor(value, look, role));
 }

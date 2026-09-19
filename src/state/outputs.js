@@ -138,6 +138,8 @@ export const ELEMENT_KINDS = {
       showPagination: true,
       rowStyle: "card",
       fontScale: 1,
+      nameFont: "theme",
+      numberFont: "theme",
       emptyText: "En attente des premiers résultats…",
     },
   },
@@ -149,10 +151,25 @@ export const ELEMENT_KINDS = {
       height: 216,
       pageSize: 3,
       rotationMs: 5000,
+      badgeScale: 1, // pastille du rang
       nameScale: 1,
       scoreScale: 1,
+      nameFont: "theme", // "theme" = police de l'onglet Apparence, sinon clé de FONTS
+      numberFont: "theme",
+      nameColor: "text",
+      scoreColor: "text",
       showHometown: true,
       flashNew: true,
+      // Carte de chaque résultat
+      cardFill: "card", // card (thème) | custom | none
+      cardColor: "#0e2a63",
+      cardOpacity: 0.92,
+      cardBorder: true,
+      cardBorderColor: null, // null = bordure du thème
+      cardRadius: null, // null = arrondi du thème (px à l'échelle 216)
+      cardShadow: true,
+      gapScale: 1,
+      paddingScale: 1,
     },
   },
   timer: {
@@ -165,6 +182,7 @@ export const ELEMENT_KINDS = {
       align: "center",
       timeScale: 1,
       fill: "none",
+      font: "theme",
     },
   },
 };
@@ -180,6 +198,7 @@ const num = (v, fb, min, max) => {
 };
 const bool = (v, fb) => (v === undefined || v === null ? fb : Boolean(v));
 const oneOf = (v, list, fb) => (list.includes(v) ? v : fb);
+const fontOrTheme = (v) => (v in FONTS ? v : "theme");
 const str = (v, fb, max = 200) => (typeof v === "string" ? v.slice(0, max) : fb);
 
 /** Recadrage en fractions de l'image : null si vide ou équivalent à l'image entière. */
@@ -282,6 +301,8 @@ export function normalizeElement(src, output) {
         showPagination: bool(src.showPagination, d.showPagination),
         rowStyle: oneOf(src.rowStyle, ["card", "line"], d.rowStyle),
         fontScale: num(src.fontScale, d.fontScale, 0.5, 2),
+        nameFont: fontOrTheme(src.nameFont),
+        numberFont: fontOrTheme(src.numberFont),
         emptyText: str(src.emptyText, d.emptyText, 120),
       };
     case "carousel":
@@ -289,10 +310,24 @@ export function normalizeElement(src, output) {
         ...base,
         pageSize: Math.round(num(src.pageSize, d.pageSize, 1, 8)),
         rotationMs: num(src.rotationMs, d.rotationMs, 1000, 60000),
-        nameScale: num(src.nameScale, d.nameScale, 0.6, 2),
-        scoreScale: num(src.scoreScale, d.scoreScale, 0.6, 2),
+        badgeScale: num(src.badgeScale, d.badgeScale, 0.4, 2.5),
+        nameScale: num(src.nameScale, d.nameScale, 0.4, 3),
+        scoreScale: num(src.scoreScale, d.scoreScale, 0.4, 3),
+        nameFont: fontOrTheme(src.nameFont),
+        numberFont: fontOrTheme(src.numberFont),
+        nameColor: textColor(src.nameColor, d.nameColor),
+        scoreColor: textColor(src.scoreColor, d.scoreColor),
         showHometown: bool(src.showHometown, d.showHometown),
         flashNew: bool(src.flashNew, d.flashNew),
+        cardFill: oneOf(src.cardFill, ["card", "custom", "none"], d.cardFill),
+        cardColor: hex(src.cardColor, d.cardColor),
+        cardOpacity: num(src.cardOpacity, d.cardOpacity, 0, 1),
+        cardBorder: bool(src.cardBorder, d.cardBorder),
+        cardBorderColor: hex(src.cardBorderColor, null),
+        cardRadius: src.cardRadius == null ? null : num(src.cardRadius, 0, 0, 200),
+        cardShadow: bool(src.cardShadow, d.cardShadow),
+        gapScale: num(src.gapScale, d.gapScale, 0, 4),
+        paddingScale: num(src.paddingScale, d.paddingScale, 0, 3),
       };
     case "timer":
       return {
@@ -301,6 +336,7 @@ export function normalizeElement(src, output) {
         align: oneOf(src.align, ["left", "center", "right"], d.align),
         timeScale: num(src.timeScale, d.timeScale, 0.3, 2),
         fill: oneOf(src.fill, ["none", "card", "black"], d.fill),
+        font: fontOrTheme(src.font),
       };
     default:
       return null;

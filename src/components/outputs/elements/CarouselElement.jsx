@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { formatScore, entryDisplayMode } from "../../../utils/score";
-import { cardStyle, fontStyle, hexToRgba, rankBadge } from "../../../state/look";
-import { paginate, useRotation } from "./util";
+import { cardStyle, hexToRgba, rankBadge } from "../../../state/look";
+import { paginate, resolveColor, themedFont, useRotation } from "./util";
 
 const FLASH_MS = 5000;
 
@@ -12,8 +12,8 @@ const FLASH_MS = 5000;
  */
 export default function CarouselElement({ el, ctx }) {
   const { look, ranked, scoreMode, byCompetitor, contextKey } = ctx;
-  const display = fontStyle(look.fonts.display);
-  const numbers = fontStyle(look.fonts.numbers);
+  const display = themedFont(el.nameFont, look, "display");
+  const numbers = themedFont(el.numberFont, look, "numbers");
   const W = el.width;
   const H = el.height;
   const unit = H / 216;
@@ -65,13 +65,22 @@ export default function CarouselElement({ el, ctx }) {
     return () => clearTimeout(t);
   }, [flash]);
 
-  const gap = r(24);
-  const nameSize = Math.max(10, Math.round(40 * unit * el.nameScale));
-  const scoreSize = Math.max(10, Math.round(56 * unit * el.scoreScale));
-  const chipPX = r(32);
-  const chipPY = r(36);
+  const gap = r(24 * el.gapScale);
+  const nameSize = Math.max(6, Math.round(40 * unit * el.nameScale));
+  const scoreSize = Math.max(6, Math.round(56 * unit * el.scoreScale));
+  const chipPX = r(32 * el.paddingScale);
+  const chipPY = r(36 * el.paddingScale);
   const sep = r(16);
-  const numberCircle = r(70);
+  const numberCircle = Math.max(6, r(70 * el.badgeScale));
+  const base = cardStyle(look, unit);
+  const borderW = Math.max(1, Math.round(2 * unit));
+  const chip = {
+    background: el.cardFill === "none" ? "transparent" : el.cardFill === "custom" ? hexToRgba(el.cardColor, el.cardOpacity) : base.background,
+    border: el.cardBorder ? `${borderW}px solid ${el.cardBorderColor ?? hexToRgba(look.colors.cardBorder, 0.9)}` : `${borderW}px solid transparent`,
+    borderRadius: el.cardRadius == null ? base.borderRadius : Math.round(el.cardRadius * unit),
+    boxShadow: el.cardShadow && el.cardFill !== "none" ? base.boxShadow : "none",
+    color: resolveColor(el.nameColor, look),
+  };
   const current = pages[pageIndex] || [];
   const slots = Array.from({ length: el.pageSize }, (_, i) => current[i] ?? null);
 
@@ -102,7 +111,7 @@ export default function CarouselElement({ el, ctx }) {
                       alignItems: "center",
                       gap: sep,
                       padding: `${chipPY}px ${chipPX}px`,
-                      ...cardStyle(look, unit),
+                      ...chip,
                       opacity: beyondCut ? 0.75 : 1,
                       minWidth: 0,
                       boxSizing: "border-box",
@@ -117,7 +126,7 @@ export default function CarouselElement({ el, ctx }) {
                         display: "grid",
                         placeItems: "center",
                         ...numbers,
-                        fontSize: r(50),
+                        fontSize: r(50 * el.badgeScale),
                       }}
                     >
                       {e.rank}
@@ -129,9 +138,10 @@ export default function CarouselElement({ el, ctx }) {
                           fontSize: nameSize,
                           lineHeight: `${nameLineHeight}px`,
                           maxHeight: `${nameLineHeight * (hometown ? 1 : 2)}px`,
-                          display: "-webkit-box",
+                          // Sur une ligne (avec la ville) : bloc simple pour que « … » s'affiche.
+                          display: hometown ? "block" : "-webkit-box",
                           WebkitBoxOrient: "vertical",
-                          WebkitLineClamp: hometown ? 1 : 2,
+                          WebkitLineClamp: hometown ? undefined : 2,
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: hometown ? "nowrap" : "normal",
@@ -152,6 +162,7 @@ export default function CarouselElement({ el, ctx }) {
                       transition={{ type: "spring", stiffness: 320, damping: 22 }}
                       style={{
                         ...numbers,
+                        color: resolveColor(el.scoreColor, look),
                         fontSize: scoreMode === "lower" || e.timeHint ? Math.round(scoreSize * 0.82) : scoreSize,
                         fontVariantNumeric: "tabular-nums lining-nums",
                         justifySelf: "end",
